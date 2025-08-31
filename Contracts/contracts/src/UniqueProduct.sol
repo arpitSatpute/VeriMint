@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
-contract AntiqueProduct is Ownable, ERC721, ERC721URIStorage{
+contract UniqueProduct is Ownable, ERC721, ERC721URIStorage{
 
 
     event NFTMinted(uint256 tokenId, address owner, string uri);
