@@ -3,6 +3,7 @@ import { useAccount } from "wagmi";
 import { useState } from "react";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
+import { useNavigate } from "react-router-dom";
 import {
   MarketplaceListing,
 } from "@/components/marketplace/MarketplaceComponents";
@@ -15,50 +16,32 @@ interface Listing {
   price: string;
   name: string;
   description: string;
+  image?: string;
 }
+
+import { demoListings as demoData } from "@/data/demoListings";
 
 export default function MarketplacePage() {
   const { isConnected } = useAccount();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
 
-  // Demo listings
-  const demoListings: Listing[] = [
-    {
-      tokenId: 1,
-      merchant: "0x1234567890123456789012345678901234567890",
-      price: "1000000000000000000",
-      name: "Digital Art #1",
-      description: "Unique digital artwork by talented artist",
-    },
-    {
-      tokenId: 2,
-      merchant: "0x0987654321098765432109876543210987654321",
-      price: "2500000000000000000",
-      name: "Virtual Land Plot",
-      description: "Premium metaverse real estate",
-    },
-    {
-      tokenId: 3,
-      merchant: "0x1234567890123456789012345678901234567890",
-      price: "500000000000000000",
-      name: "Limited Edition Collectible",
-      description: "Scarce NFT with utility",
-    },
-  ];
+  // Use shared demo listings
+  const demoListings: Listing[] = demoData;
 
   const handlePurchase = async (supply: number) => {
     if (!selectedProduct) return;
 
     setIsLoading(true);
     try {
-      // TODO: Implement escrow purchase logic
       console.log("Purchasing:", selectedProduct, "Quantity:", supply);
       alert(
         `Purchase initiated for product ${selectedProduct} with quantity ${supply}`
       );
       setSelectedProduct(null);
+      navigate(`/buy/${selectedProduct}`, { state: { tokenId: selectedProduct } });
     } catch (error) {
       console.error("Purchase failed:", error);
       alert("Purchase failed. Please try again.");
@@ -144,8 +127,7 @@ export default function MarketplacePage() {
           {/* Listings Grid */}
           <MarketplaceListing
             listings={filteredListings}
-            isLoading={isLoading}
-            onPurchase={(tokenId: number) => setSelectedProduct(tokenId)}
+            onPurchase={(tokenId: number) => navigate(`/buy/${tokenId}`, { state: { listing: filteredListings.find(l => l.tokenId === tokenId) } })}
           />
 
           {/* Stats */}

@@ -14,6 +14,21 @@ export const weiToEth = (wei: string | bigint): string => {
 };
 
 /**
+ * Convert Wei to Gwei
+ * @param wei - Amount in Wei (as string or bigint)
+ * @returns Amount in Gwei formatted to 3 decimal places
+ */
+export const weiToGwei = (wei: string | bigint): string => {
+  try {
+    const weiNum = typeof wei === "string" ? BigInt(wei) : wei;
+    const gweiNum = Number(weiNum) / 1e9;
+    return gweiNum.toFixed(3);
+  } catch {
+    return "0";
+  }
+};
+
+/**
  * Format price for display with both Wei and ETH
  * @param wei - Amount in Wei (as string or bigint)
  * @returns Formatted string like "0.001234 ETH"

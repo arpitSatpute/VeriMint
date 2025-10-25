@@ -107,15 +107,30 @@ contract MultiProduct is Ownable, ERC1155URIStorage {
     }
 
     // --- LISTING ---
-    function listProduct(uint256 tokenId, uint256 pricePerUnit) external {
+    function listProduct(uint256 tokenId) external {
         require(mintedProduct[tokenId].merchant == msg.sender, "Not merchant");
-        require(pricePerUnit > 0, "Invalid price");
+        uint256 pricePerUnit = mintedProduct[tokenId].price;
+        require(!isProductListed[tokenId], "Already listed");
 
         listedProduct[tokenId] = ListingProduct({merchant: msg.sender, price: pricePerUnit});
         listedProductTokens.push(tokenId);
         isProductListed[tokenId] = true;
 
         emit ProductListed(tokenId, msg.sender, pricePerUnit);
+    }
+
+    function unlistProductMerchant() external view returns (uint256[] memory) {
+        uint256[] memory products = merchantProducts[msg.sender];
+        uint256[] memory result = new uint256[](products.length);
+        uint256 count = 0;
+        for (uint256 i = 0; i < products.length; i++) {
+            uint256 tokenId = products[i];
+            if (!isProductListed[tokenId]) {
+                result[count] = tokenId;
+                count++;
+            }
+        }
+        return result;
     }
 
     function cancelProductListing(uint256 tokenId) external {

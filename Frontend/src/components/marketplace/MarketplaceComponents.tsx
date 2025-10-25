@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { weiToEth } from "@/utils/priceFormatter";
+import { NFTCard } from "@/components/ui/nft-card/NFTCard";
+import type { NFT } from "@/components/ui/nft-card/types";
 
 interface ListProductFormProps {
   tokenId: number;
@@ -95,15 +97,19 @@ interface MarketplaceListingProps {
     price: string;
     name?: string;
     description?: string;
+    image?: string;
   }>;
-  isLoading?: boolean;
   onPurchase?: (tokenId: number) => void;
+  singleRow?: boolean;
+  /**
+   * When true, render only the first 2 listings in a single row (2 columns)
+   */
 }
 
 export const MarketplaceListing = ({
   listings,
-  isLoading = false,
   onPurchase,
+  singleRow = false,
 }: MarketplaceListingProps) => {
   if (listings.length === 0) {
     return (
@@ -115,62 +121,41 @@ export const MarketplaceListing = ({
     );
   }
 
+  const displayListings = singleRow ? listings.slice(0, 2) : listings;
+  const gridClass = "grid grid-cols-1 md:grid-cols-2 gap-4"; // max 2 columns on md+
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {listings.map((listing) => (
-        <div
-          key={listing.tokenId}
-          className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden hover:shadow-lg transition-shadow"
-        >
-          <div className="p-4">
-            <h3 className="text-lg font-semibold mb-2">
-              {listing.name || `Product #${listing.tokenId}`}
-            </h3>
-            {listing.description && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                {listing.description}
-              </p>
-            )}
+    <div className={gridClass}>
+      {displayListings.map((listing) => {
+        const nft: NFT = {
+          id: `product-${listing.tokenId}`,
+          name: listing.name || `Product #${listing.tokenId}`,
+          description: listing.description || "",
+          image: (listing as any).image || "https://via.placeholder.com/500",
+          owner: listing.merchant,
+          collection: "VeriMint",
+          tokenId: String(listing.tokenId),
+          contractAddress: "",
+          chainId: 1,
+          attributes: [],
+        };
 
-            <div className="grid grid-cols-2 gap-2 mb-3">
-              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Token ID
-                </p>
-                <p className="font-semibold">{listing.tokenId}</p>
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Price
-                </p>
-                <p className="font-semibold text-green-600 dark:text-green-400">
-                  {weiToEth(listing.price)} ETH
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded mb-4">
-              <p className="text-xs text-gray-600 dark:text-gray-400">
-                Merchant
-              </p>
-              <p className="text-sm font-mono">
-                {listing.merchant.slice(0, 6)}...{listing.merchant.slice(-4)}
-              </p>
-            </div>
-
-            {onPurchase && (
-              <Button
-                fullWidth
-                color="primary"
-                onPress={() => onPurchase(listing.tokenId)}
-                disabled={isLoading}
-              >
-                Buy Now
-              </Button>
-            )}
+        return (
+          <div key={listing.tokenId} className="h-full">
+            <NFTCard
+              nft={nft}
+              priceWei={listing.price}
+              onOwnerClick={() => {
+                /* optional: open explorer or merchant profile */
+              }}
+              onNFTClick={() => {
+                // delegate to parent (e.g. navigate to buy page)
+                onPurchase?.(listing.tokenId);
+              }}
+            />
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
