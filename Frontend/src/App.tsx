@@ -16,6 +16,7 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <WagmiProvider config={config}>
+      <div className="dark text-foreground bg-background">
       <ThirdwebProvider>
         <QueryClientProvider client={queryClient} >
           <Routes>
@@ -27,6 +28,7 @@ function App() {
           </Routes>
         </QueryClientProvider>
       </ThirdwebProvider>
+      </div>
     </WagmiProvider>
    
   );

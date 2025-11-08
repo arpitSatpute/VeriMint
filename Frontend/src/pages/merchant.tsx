@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { useState } from "react"
 import { Plus, Flame, XCircle, ShoppingCart, Eye, EyeOff, Package } from "lucide-react"
+import DefaultLayout from "@/layouts/default";
 
 type ElegantShapeProps = {
   className?: string;
@@ -68,8 +69,9 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
     if (text.length <= limit) return text
     return text.substring(0, limit) + '...'
   }
-
+  
   return (
+    
     <motion.div
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
@@ -312,6 +314,7 @@ export default function MerchantDashboard() {
   }
 
   return (
+    <DefaultLayout>
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
@@ -445,5 +448,6 @@ export default function MerchantDashboard() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
     </div>
+    </DefaultLayout>
   )
 }

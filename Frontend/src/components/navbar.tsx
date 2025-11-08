@@ -48,7 +48,6 @@ export const Navbar = ({
 
         {/* Right Section - Theme Switch & Resume Button */}
         <div className="flex items-center space-x-4">
-          <ThemeSwitch />
             <ConnectButton
               client={client}
               wallets={wallets}
