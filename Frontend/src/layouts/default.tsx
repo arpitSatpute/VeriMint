@@ -10,18 +10,18 @@ export default function DefaultLayout({
   return (
     <div className="relative flex flex-col min-h-screen w-full">
       <Navbar />
-      <main className="w-full flex-grow pt-16">
+      <main className="w-full flex-grow pt-20">
         {children}
       </main>
-      <footer className="w-full flex items-center justify-center py-3">
+      <footer className="w-full flex items-center justify-center py-3 bg-black/40 backdrop-blur-md border-t border-gray-800">
         <Link
           isExternal
           className="flex items-center gap-1 text-current"
-          href="https://heroui.com"
-          title="heroui.com homepage"
+          href="https://verimint.io"
+          title="VeriMint homepage"
         >
-          <span className="text-default-600">Powered by</span>
-          <p className="text-primary">HeroUI</p>
+          <span className="text-gray-400">Powered by</span>
+          <p className="text-orange-500">VeriMint</p>
         </Link>
       </footer>
     </div>
