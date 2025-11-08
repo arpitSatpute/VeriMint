@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { useState } from "react"
-import { Plus, Flame, XCircle, ShoppingCart, Eye, EyeOff, Package } from "lucide-react"
-import DefaultLayout from "@/layouts/default";
+import { Plus, Flame, XCircle, ShoppingCart, Eye, EyeOff, Package, Zap, Sparkles, X, CheckCircle } from "lucide-react"
+import { useNavigate } from "react-router-dom"
+import DefaultLayout from "@/layouts/default"
 
 type ElegantShapeProps = {
   className?: string;
@@ -71,7 +72,6 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
   }
   
   return (
-    
     <motion.div
       initial={{ opacity: 0, y: 40 }}
       animate={{ opacity: 1, y: 0 }}
@@ -212,6 +212,8 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
 
 export default function MerchantDashboard() {
   const [activeView, setActiveView] = useState('all')
+  const [showMintModal, setShowMintModal] = useState(false)
+  const navigate = useNavigate()
 
   const nfts = [
     {
@@ -297,8 +299,14 @@ export default function MerchantDashboard() {
     alert(`NFT #${id} removed from listing`)
   }
 
-  const handleMintRedirect = () => {
-    alert('Redirecting to Mint NFT form...')
+  const handleMintVirtual = () => {
+    navigate('/virtualMint')
+    setShowMintModal(false)
+  }
+
+  const handleMintPhysical = () => {
+    navigate('/physicalMint')
+    setShowMintModal(false)
   }
 
   const filteredNfts = activeView === 'all' 
@@ -354,7 +362,7 @@ export default function MerchantDashboard() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6">
             <img src="https://kokonutui.com/logo.svg" alt="Logo" width={20} height={20} className="w-5 h-5" />
-            <span className="text-sm text-white/60 tracking-wide">21st.dev</span>
+            <span className="text-sm text-white/60 tracking-wide">VeriMint</span>
           </div>
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -370,7 +378,7 @@ export default function MerchantDashboard() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={handleMintRedirect}
+              onClick={() => setShowMintModal(true)}
               className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-rose-500/20 border-2 border-white/[0.15] text-white font-semibold hover:from-indigo-500/30 hover:to-rose-500/30 transition-all shadow-lg shadow-indigo-500/10"
             >
               <Plus className="w-5 h-5" />
@@ -445,6 +453,156 @@ export default function MerchantDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Mint Modal Dialog */}
+      <AnimatePresence>
+        {showMintModal && (
+          <>
+            {/* Blurred Background */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              onClick={() => setShowMintModal(false)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.4, 0.25, 1] }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div className="w-full max-w-2xl bg-[#0a0a0a] border border-white/[0.12] rounded-3xl p-8 shadow-2xl">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-white mb-2">
+                      Create Your NFT
+                    </h2>
+                    <p className="text-white/50">Choose the type of product you want to mint</p>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowMintModal(false)}
+                    className="p-2 hover:bg-white/[0.05] rounded-lg transition-all"
+                  >
+                    <X className="w-6 h-6 text-white/60 hover:text-white" />
+                  </motion.button>
+                </div>
+
+                {/* Options Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Virtual Product Card */}
+                  <motion.button
+                    whileHover={{ scale: 1.02, y: -5 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleMintVirtual}
+                    className="group relative overflow-hidden rounded-2xl border-2 border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 to-transparent p-8 text-left transition-all hover:border-indigo-500/60 hover:bg-gradient-to-br hover:from-indigo-500/10 hover:to-transparent"
+                  >
+                    {/* Background Gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/0 via-transparent to-indigo-600/0 group-hover:from-indigo-600/5 transition-all" />
+                    
+                    {/* Content */}
+                    <div className="relative z-10 space-y-4">
+                      <div>
+                        <h3 className="text-2xl font-bold text-white mb-2">
+                          Virtual Product
+                        </h3>
+                        <p className="text-white/60 text-sm leading-relaxed">
+                          Create digital assets like art, music, 3D models, domain names, and virtual real estate
+                        </p>
+                      </div>
+
+                      {/* Features List */}
+                      <div className="space-y-2 pt-4">
+                        <div className="flex items-center gap-2 text-indigo-300 text-sm">
+                          <Sparkles className="w-4 h-4" />
+                          <span>Instant delivery</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-indigo-300 text-sm">
+                          <Zap className="w-4 h-4" />
+                          <span>Multiple file formats</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-indigo-300 text-sm">
+                          <Package className="w-4 h-4" />
+                          <span>Unlockable content</span>
+                        </div>
+                      </div>
+
+                      {/* CTA Button */}
+                      <div className="pt-4">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-medium group-hover:bg-indigo-500/30 transition-all">
+                          <Sparkles className="w-4 h-4" />
+                          Mint Virtual
+                        </div>
+                      </div>
+                    </div>
+                  </motion.button>
+
+                  {/* Physical Product Card */}
+                  <motion.button
+                    whileHover={{ scale: 1.02, y: -5 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleMintPhysical}
+                    className="group relative overflow-hidden rounded-2xl border-2 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-transparent p-8 text-left transition-all hover:border-rose-500/60 hover:bg-gradient-to-br hover:from-rose-500/10 hover:to-transparent"
+                  >
+                    {/* Background Gradient */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-rose-600/0 via-transparent to-rose-600/0 group-hover:from-rose-600/5 transition-all" />
+                    
+                    {/* Content */}
+                    <div className="relative z-10 space-y-4">
+                      <div>
+                        <h3 className="text-2xl font-bold text-white mb-2">
+                          Physical Product
+                        </h3>
+                        <p className="text-white/60 text-sm leading-relaxed">
+                          Create NFTs for physical items with authenticity certificates and provenance tracking
+                        </p>
+                      </div>
+
+                      {/* Features List */}
+                      <div className="space-y-2 pt-4">
+                        <div className="flex items-center gap-2 text-rose-300 text-sm">
+                          <Package className="w-4 h-4" />
+                          <span>Authenticity verified</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-rose-300 text-sm">
+                          <Zap className="w-4 h-4" />
+                          <span>Physical delivery</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-rose-300 text-sm">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Provenance tracking</span>
+                        </div>
+                      </div>
+
+                      {/* CTA Button */}
+                      <div className="pt-4">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-medium group-hover:bg-rose-500/30 transition-all">
+                          <Package className="w-4 h-4" />
+                          Mint Physical
+                        </div>
+                      </div>
+                    </div>
+                  </motion.button>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-8 pt-6 border-t border-white/[0.08]">
+                  <p className="text-center text-white/40 text-sm">
+                    Not sure? You can mint both types of products and manage them from your dashboard
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
     </div>

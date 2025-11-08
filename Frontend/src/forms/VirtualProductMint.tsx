@@ -1,5 +1,5 @@
 import { motion } from "framer-motion"
-import { useState, type SelectHTMLAttributes, type ComponentType, type TextareaHTMLAttributes, type InputHTMLAttributes } from "react"
+import { useState, type SelectHTMLAttributes, type ComponentType, type TextareaHTMLAttributes, type InputHTMLAttributes, type ChangeEvent, type FormEvent } from "react"
 import { Upload, X, DollarSign, Layers, FileText, Tag, Sparkles, Image as ImageIcon, File } from "lucide-react"
 
 
@@ -41,7 +41,13 @@ function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate 
   )
 }
 
-function FormInput({ label, icon: Icon, required, ...props }: { label: string; icon?: ComponentType<any>; required?: boolean } & InputHTMLAttributes<HTMLInputElement>) {
+interface FormInputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label: string
+  icon?: ComponentType<React.SVGProps<SVGSVGElement>>
+  required?: boolean
+}
+
+function FormInput({ label, icon: Icon, required, ...props }: FormInputProps) {
   return (
     <div className="space-y-2">
       <label className="flex items-center gap-2 text-sm font-medium text-white/70">
@@ -59,7 +65,13 @@ function FormInput({ label, icon: Icon, required, ...props }: { label: string; i
   )
 }
 
-function FormTextarea({ label, icon: Icon, required, ...props }: { label: string; icon?: ComponentType<any>; required?: boolean } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
+interface FormTextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string
+  icon?: ComponentType<React.SVGProps<SVGSVGElement>>
+  required?: boolean
+}
+
+function FormTextarea({ label, icon: Icon, required, ...props }: FormTextareaProps) {
   return (
     <div className="space-y-2">
       <label className="flex items-center gap-2 text-sm font-medium text-white/70">
@@ -79,7 +91,7 @@ type Option = { value: string; label: string }
 
 interface FormSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string
-  icon?: ComponentType<any>
+  icon?: ComponentType<React.SVGProps<SVGSVGElement>>
   required?: boolean
   options: Option[]
 }
@@ -106,10 +118,30 @@ function FormSelect({ label, icon: Icon, required, options, ...props }: FormSele
   )
 }
 
+interface FileInfoType {
+  name: string
+  size: string
+  type: string
+}
+
+interface FormDataType {
+  name: string
+  description: string
+  price: string
+  supply: string
+  category: string
+  rarity: string
+  collection: string
+  properties: string
+  unlockableContent: string
+  externalLink: string
+  royalties: string
+}
+
 export default function VirtualProductMint() {
-  const [imagePreview, setImagePreview] = useState(null)
-  const [fileInfo, setFileInfo] = useState(null)
-  const [formData, setFormData] = useState({
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [fileInfo, setFileInfo] = useState<FileInfoType | null>(null)
+  const [formData, setFormData] = useState<FormDataType>({
     name: '',
     description: '',
     price: '',
@@ -123,19 +155,19 @@ export default function VirtualProductMint() {
     royalties: '10',
   })
 
-  const handleImageUpload = (e: any) => {
-    const file = e.target.files[0]
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setImagePreview(reader.result)
+        setImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleFileUpload = (e: any) => {
-    const file = e.target.files[0]
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (file) {
       setFileInfo({
         name: file.name,
@@ -145,7 +177,7 @@ export default function VirtualProductMint() {
     }
   }
 
-  const handleInputChange = (e: any) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
@@ -153,7 +185,7 @@ export default function VirtualProductMint() {
     }))
   }
 
-  const handleSubmit = (e: any) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     console.log('Form Data:', formData)
     console.log('File Info:', fileInfo)
@@ -206,7 +238,7 @@ export default function VirtualProductMint() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6">
             <img src="https://kokonutui.com/logo.svg" alt="Logo" width={20} height={20} className="w-5 h-5" />
-            <span className="text-sm text-white/60 tracking-wide">21st.dev</span>
+            <span className="text-sm text-white/60 tracking-wide">VeriMint</span>
           </div>
           
           <h1 className="text-3xl md:text-5xl font-bold mb-3">
@@ -420,7 +452,6 @@ export default function VirtualProductMint() {
                 value={formData.collection}
                 onChange={handleInputChange}
                 placeholder="e.g., Cosmic Dreams Collection"
-                required={undefined}
               />
 
               <FormTextarea
@@ -431,7 +462,6 @@ export default function VirtualProductMint() {
                 onChange={handleInputChange}
                 placeholder="List special properties or attributes (e.g., Background: Blue, Eyes: Laser, Rarity: Gold)"
                 rows={3}
-                required={undefined}
               />
 
               <FormTextarea
@@ -442,7 +472,6 @@ export default function VirtualProductMint() {
                 onChange={handleInputChange}
                 placeholder="Include content that will be revealed after purchase (e.g., access code, bonus file, private link)"
                 rows={2}
-                required={undefined}
               />
 
               <FormInput
@@ -453,7 +482,6 @@ export default function VirtualProductMint() {
                 onChange={handleInputChange}
                 type="url"
                 placeholder="https://your-website.com"
-                required={undefined}
               />
 
               <FormInput
@@ -467,7 +495,6 @@ export default function VirtualProductMint() {
                 max="50"
                 step="0.5"
                 placeholder="e.g., 10"
-                required={undefined}
               />
               <p className="text-xs text-white/40">
                 Suggested: 10%. You'll receive this percentage on all future sales

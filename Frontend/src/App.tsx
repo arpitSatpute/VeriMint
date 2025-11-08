@@ -11,6 +11,7 @@ import { config } from "@/config/config";
 import {ThirdwebProvider} from "thirdweb/react";
 import PhysicalProductMint from "./forms/PhysicalProductMint";
 import VirtualProductMint from "./forms/VirtualProductMint";
+import CreateOrderForm from "./forms/CreateOrder";
 
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ function App() {
             <Route element={<AboutPage />} path="/about" />
             <Route element={<PhysicalProductMint />} path="/physicalMint" />
             <Route element={<VirtualProductMint />} path="/virtualMint" />
+            <Route element={<CreateOrderForm />} path="/createOrder" />
           </Routes>
         </QueryClientProvider>
       </ThirdwebProvider>

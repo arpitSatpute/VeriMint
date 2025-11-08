@@ -1,8 +1,19 @@
 import { motion } from "framer-motion"
 import React, { useState } from "react"
-import { Upload, X, Calendar, Package, Hash, DollarSign, Layers, FileText, Tag, CheckCircle } from "lucide-react"
+import { Upload, X, Calendar, Package, Hash, DollarSign, Layers, FileText, CheckCircle, Tag } from "lucide-react"
 
-function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }) {
+
+type ElegantShapeProps = {
+  className?: string;
+  delay?: number;
+  width?: number;
+  height?: number;
+  rotate?: number;
+  gradient?: string;
+}
+
+
+function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }: ElegantShapeProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
@@ -25,13 +36,16 @@ function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate 
         style={{ width, height }}
         className="relative"
       >
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r to-transparent backdrop-blur-[2px] border-2 border-white/[0.15] shadow-[0_8px_32px_0_rgba(255,255,255,0.1)]" style={{ backgroundImage: `linear-gradient(to right, ${gradient.replace('from-', '')}, transparent)` }} />
+        <div 
+          className="absolute inset-0 rounded-full bg-gradient-to-r to-transparent backdrop-blur-[2px] border-2 border-white/[0.15] shadow-[0_8px_32px_0_rgba(255,255,255,0.1)]"
+          style={{ backgroundImage: `linear-gradient(to right, ${gradient.replace('from-', '')}, transparent)` }} 
+        />
       </motion.div>
     </motion.div>
   )
 }
 
-type IconType = (props: React.SVGProps<SVGSVGElement>) => JSX.Element
+type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>
 
 interface FormInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: React.ReactNode
@@ -57,7 +71,13 @@ function FormInput({ label, icon: Icon, required, ...props }: FormInputProps) {
   )
 }
 
-function FormTextarea({ label, icon: Icon, required, ...props }) {
+interface FormTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: React.ReactNode
+  icon?: IconType
+  required?: boolean
+}
+
+function FormTextarea({ label, icon: Icon, required, ...props }: FormTextareaProps) {
   return (
     <div className="space-y-2">
       <label className="flex items-center gap-2 text-sm font-medium text-white/70">
@@ -73,7 +93,19 @@ function FormTextarea({ label, icon: Icon, required, ...props }) {
   )
 }
 
-function FormSelect({ label, icon: Icon, required, options, ...props }) {
+interface SelectOption {
+  value: string
+  label: string
+}
+
+interface FormSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label: React.ReactNode
+  icon?: IconType
+  required?: boolean
+  options: SelectOption[]
+}
+
+function FormSelect({ label, icon: Icon, required, options, ...props }: FormSelectProps) {
   return (
     <div className="space-y-2">
       <label className="flex items-center gap-2 text-sm font-medium text-white/70">
@@ -95,9 +127,27 @@ function FormSelect({ label, icon: Icon, required, options, ...props }) {
   )
 }
 
+interface FormDataType {
+  name: string
+  description: string
+  productDetails: string
+  identityNumber: string
+  batchNumber: string
+  manufacturingDate: string
+  expiryDate: string
+  price: string
+  supply: string
+  category: string
+  condition: string
+  weight: string
+  dimensions: string
+  shippingInfo: string
+  warranty: string
+}
+
 export default function PhysicalProductMint() {
-  const [imagePreview, setImagePreview] = useState(null)
-  const [formData, setFormData] = useState({
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [formData, setFormData] = useState<FormDataType>({
     name: '',
     description: '',
     productDetails: '',
@@ -115,18 +165,18 @@ export default function PhysicalProductMint() {
     warranty: '',
   })
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0]
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setImagePreview(reader.result)
+        setImagePreview(reader.result as string)
       }
       reader.readAsDataURL(file)
     }
   }
 
-  const handleInputChange = (e: any) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
@@ -134,7 +184,7 @@ export default function PhysicalProductMint() {
     }))
   }
 
-  const handleSubmit = (e: any) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     console.log('Form Data:', formData)
     alert('Minting Physical Product NFT...')
@@ -186,7 +236,7 @@ export default function PhysicalProductMint() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6">
             <img src="https://kokonutui.com/logo.svg" alt="Logo" width={20} height={20} className="w-5 h-5" />
-            <span className="text-sm text-white/60 tracking-wide">21st.dev</span>
+            <span className="text-sm text-white/60 tracking-wide">VeriMint</span>
           </div>
           
           <h1 className="text-3xl md:text-5xl font-bold mb-3">
@@ -249,7 +299,7 @@ export default function PhysicalProductMint() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
                   label="Product Name"
-                  icon={Tag}
+                  icon={Tag as IconType}
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
@@ -258,7 +308,7 @@ export default function PhysicalProductMint() {
                 />
                 <FormSelect
                   label="Category"
-                  icon={Layers}
+                  icon={Layers as IconType}
                   name="category"
                   value={formData.category}
                   onChange={handleInputChange}
@@ -278,7 +328,7 @@ export default function PhysicalProductMint() {
 
               <FormTextarea
                 label="Description"
-                icon={FileText}
+                icon={FileText as IconType}
                 name="description"
                 value={formData.description}
                 onChange={handleInputChange}
@@ -289,7 +339,7 @@ export default function PhysicalProductMint() {
 
               <FormTextarea
                 label="Product Details"
-                icon={Package}
+                icon={Package as IconType}
                 name="productDetails"
                 value={formData.productDetails}
                 onChange={handleInputChange}
@@ -308,7 +358,7 @@ export default function PhysicalProductMint() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
                   label="Identity Number"
-                  icon={Hash}
+                  icon={Hash as IconType}
                   name="identityNumber"
                   value={formData.identityNumber}
                   onChange={handleInputChange}
@@ -317,7 +367,7 @@ export default function PhysicalProductMint() {
                 />
                 <FormInput
                   label="Batch Number"
-                  icon={Hash}
+                  icon={Hash as IconType}
                   name="batchNumber"
                   value={formData.batchNumber}
                   onChange={handleInputChange}
@@ -336,7 +386,7 @@ export default function PhysicalProductMint() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
                   label="Manufacturing Date"
-                  icon={Calendar}
+                  icon={Calendar as IconType}
                   name="manufacturingDate"
                   value={formData.manufacturingDate}
                   onChange={handleInputChange}
@@ -344,13 +394,13 @@ export default function PhysicalProductMint() {
                   required
                 />
                 <FormInput
-                                  label="Expiry Date"
-                                  icon={Calendar}
-                                  name="expiryDate"
-                                  value={formData.expiryDate}
-                                  onChange={handleInputChange}
-                                  type="date"
-                                  placeholder="Optional" required={undefined}                />
+                  label="Expiry Date"
+                  icon={Calendar as IconType}
+                  name="expiryDate"
+                  value={formData.expiryDate}
+                  onChange={handleInputChange}
+                  type="date"
+                />
               </div>
             </div>
 
@@ -363,7 +413,7 @@ export default function PhysicalProductMint() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormInput
                   label="Price (ETH)"
-                  icon={DollarSign}
+                  icon={DollarSign as IconType}
                   name="price"
                   value={formData.price}
                   onChange={handleInputChange}
@@ -374,7 +424,7 @@ export default function PhysicalProductMint() {
                 />
                 <FormInput
                   label="Total Supply"
-                  icon={Layers}
+                  icon={Layers as IconType}
                   name="supply"
                   value={formData.supply}
                   onChange={handleInputChange}
@@ -394,7 +444,7 @@ export default function PhysicalProductMint() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormSelect
                   label="Condition"
-                  icon={CheckCircle}
+                  icon={CheckCircle as IconType}
                   name="condition"
                   value={formData.condition}
                   onChange={handleInputChange}
@@ -409,44 +459,40 @@ export default function PhysicalProductMint() {
                 />
                 <FormInput
                   label="Weight"
-                  icon={Package}
+                  icon={Package as IconType}
                   name="weight"
                   value={formData.weight}
                   onChange={handleInputChange}
                   placeholder="e.g., 500g"
-                  required={undefined}
                 />
               </div>
 
               <FormInput
                 label="Dimensions (L x W x H)"
-                icon={Package}
+                icon={Package as IconType}
                 name="dimensions"
                 value={formData.dimensions}
                 onChange={handleInputChange}
                 placeholder="e.g., 20cm x 15cm x 5cm"
-                required={undefined}
               />
 
               <FormTextarea
                 label="Shipping Information"
-                icon={Package}
+                icon={Package as IconType}
                 name="shippingInfo"
                 value={formData.shippingInfo}
                 onChange={handleInputChange}
                 placeholder="Provide shipping details, estimated delivery time, etc..."
                 rows={2}
-                required={undefined}
               />
 
               <FormInput
                 label="Warranty Period"
-                icon={CheckCircle}
+                icon={CheckCircle as IconType}
                 name="warranty"
                 value={formData.warranty}
                 onChange={handleInputChange}
                 placeholder="e.g., 1 year manufacturer warranty"
-                required={undefined}
               />
             </div>
 
