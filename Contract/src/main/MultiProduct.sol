@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-/**
- * @title MultiProduct
- * @notice ERC1155-based product marketplace supporting multiple merchants and escrow integration.
- */
-
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import {ERC1155URIStorage} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155URIStorage.sol";
 
-// ERC1155URIStorage already inherits ERC1155, so inherit only ERC1155URIStorage here
 contract MultiProduct is Ownable, ERC1155URIStorage {
     uint256 private _nextProductId;
     uint256 private _nextOrderId;
+    address public escrowAddress;
 
-    address public escrowAddress; // escrow contract set by owner
+    enum DeliveryStatus { Pending, InTransit, Delivered, Failed }
 
     event ProductMinted(
         uint256 indexed tokenId,
@@ -24,31 +19,39 @@ contract MultiProduct is Ownable, ERC1155URIStorage {
         uint256 pricePerUnit,
         string name,
         string description,
+        string productType,
         string tokenURI
     );
-
-    event ProductListed(uint256 indexed tokenId, address indexed merchant, uint256 pricePerUnit);
+    event ProductListed(uint256 indexed tokenId, address indexed merchant, uint256 pricePerUnit, uint256 listedAt);
     event OrderCreated(uint256 indexed orderId, uint256 indexed tokenId, address buyer, uint256 supply, uint256 totalPrice, address merchant);
     event OrderReleased(uint256 indexed orderId);
     event OrderCancelled(uint256 indexed orderId);
-
-    // ✅ FIXED: no argument to Ownable
-    constructor() ERC1155("Veri") Ownable(msg.sender) {
-    }
+    event DeliveryUpdated(uint256 indexed orderId, DeliveryStatus status, uint256 timestamp);
+    event DeliveryConfirmed(uint256 indexed orderId, uint256 timestamp);
 
     struct Product {
         string name;
         string description;
         address merchant;
         uint256 price;
+        string productType;
+        string deliveryPointHash;
+        uint256 mintedAt;
     }
 
     struct Order {
         uint256 tokenId;
+        string productType;
         uint256 supply;
         uint256 price;
         address merchant;
         address buyer;
+        uint256 createdAt;
+        uint256 releasedAt;
+        uint256 cancelledAt;
+        DeliveryStatus deliveryStatus;
+        uint256 deliveryUpdatedAt;
+        uint256 deliveryConfirmedAt;
     }
 
     struct ListingProduct {
@@ -61,44 +64,54 @@ contract MultiProduct is Ownable, ERC1155URIStorage {
     mapping(uint256 => bool) public isProductListed;
     uint256[] private listedProductTokens;
     mapping(address => uint256[]) private merchantProducts;
-
     mapping(uint256 => Order) public orderListed;
-    mapping(uint256 => bool) public isOrderRedeemed;
     mapping(uint256 => uint256) public reservedSupply;
+    mapping(uint256 => uint256) public listedAt;
 
     modifier onlyEscrow() {
-        require(msg.sender == escrowAddress, "Only escrow can call");
+        require(msg.sender == escrowAddress, "Only escrow");
         _;
     }
 
-    // --- ADMIN ---
+    constructor() ERC1155("") Ownable(msg.sender) {}
+
     function setEscrowAddress(address _escrow) external onlyOwner {
         escrowAddress = _escrow;
     }
 
-    // --- MINTING ---
     function mintProductNft(
         uint256 supply,
-        uint256 _price,
-        string calldata _name,
-        string calldata _description,
+        uint256 price,
+        string calldata name,
+        string calldata description,
+        string calldata productType,
+        string calldata deliveryPointHash,
         string calldata tokenURI
-    ) public returns (uint256) {
-        require(_price > 0, "Invalid price");
+    ) external returns (uint256) {
+        require(price > 0, "Invalid price");
         require(supply > 0, "Invalid supply");
+        bytes32 typeHash = keccak256(bytes(productType));
+        require(
+            typeHash == keccak256(bytes("virtual")) || typeHash == keccak256(bytes("physical")),
+            "Invalid type"
+        );
 
         uint256 tokenId = ++_nextProductId;
         _mint(msg.sender, tokenId, supply, "");
         _setURI(tokenId, tokenURI);
         merchantProducts[msg.sender].push(tokenId);
+
         mintedProduct[tokenId] = Product({
-            name: _name,
-            description: _description,
+            name: name,
+            description: description,
             merchant: msg.sender,
-            price: _price
+            price: price,
+            productType: productType,
+            deliveryPointHash: typeHash == keccak256(bytes("physical")) ? deliveryPointHash : "",
+            mintedAt: block.timestamp
         });
 
-        emit ProductMinted(tokenId, msg.sender, supply, _price, _name, _description, tokenURI);
+        emit ProductMinted(tokenId, msg.sender, supply, price, name, description, productType, tokenURI);
         return tokenId;
     }
 
@@ -106,40 +119,39 @@ contract MultiProduct is Ownable, ERC1155URIStorage {
         return merchantProducts[merchant];
     }
 
-    // --- LISTING ---
     function listProduct(uint256 tokenId) external {
-        require(mintedProduct[tokenId].merchant == msg.sender, "Not merchant");
-        uint256 pricePerUnit = mintedProduct[tokenId].price;
+        Product memory p = mintedProduct[tokenId];
+        require(p.merchant == msg.sender, "Not merchant");
         require(!isProductListed[tokenId], "Already listed");
 
-        listedProduct[tokenId] = ListingProduct({merchant: msg.sender, price: pricePerUnit});
+        listedProduct[tokenId] = ListingProduct({merchant: msg.sender, price: p.price});
         listedProductTokens.push(tokenId);
         isProductListed[tokenId] = true;
+        listedAt[tokenId] = block.timestamp;
 
-        emit ProductListed(tokenId, msg.sender, pricePerUnit);
+        emit ProductListed(tokenId, msg.sender, p.price, block.timestamp);
     }
 
-    function unlistProductMerchant() external view returns (uint256[] memory) {
+    function getUnlistedProductsMerchant() external view returns (uint256[] memory) {
         uint256[] memory products = merchantProducts[msg.sender];
         uint256[] memory result = new uint256[](products.length);
         uint256 count = 0;
         for (uint256 i = 0; i < products.length; i++) {
-            uint256 tokenId = products[i];
-            if (!isProductListed[tokenId]) {
-                result[count] = tokenId;
-                count++;
+            if (!isProductListed[products[i]]) {
+                result[count++] = products[i];
             }
         }
+        assembly { mstore(result, count) }
         return result;
     }
 
     function cancelProductListing(uint256 tokenId) external {
         ListingProduct memory listing = listedProduct[tokenId];
-        require(listing.merchant == msg.sender, "Not your product");
-
+        require(listing.merchant == msg.sender, "Not owner");
         delete listedProduct[tokenId];
         _removeProductFromList(tokenId);
         isProductListed[tokenId] = false;
+        listedAt[tokenId] = 0;
     }
 
     function _removeProductFromList(uint256 tokenId) internal {
@@ -152,89 +164,109 @@ contract MultiProduct is Ownable, ERC1155URIStorage {
         }
     }
 
-    // --- VIEW LISTINGS ---
-    function getAllListing() external view returns (ListingProduct[] memory, uint256[] memory) {
+    function getAllListing() external view returns (ListingProduct[] memory, uint256[] memory, Product[] memory) {
         uint256 count = listedProductTokens.length;
         ListingProduct[] memory listings = new ListingProduct[](count);
         uint256[] memory tokenIds = new uint256[](count);
+        Product[] memory products = new Product[](count);
 
         for (uint256 i = 0; i < count; i++) {
             uint256 id = listedProductTokens[i];
             listings[i] = listedProduct[id];
             tokenIds[i] = id;
+            products[i] = mintedProduct[id];
         }
-        return (listings, tokenIds);
+        return (listings, tokenIds, products);
     }
 
-    function getListedProduct(uint256 tokenId) external view returns (address merchant, uint256 price) {
+    function getListedProduct(uint256 tokenId) external view returns (address, uint256) {
         ListingProduct memory p = listedProduct[tokenId];
         return (p.merchant, p.price);
     }
 
-    // --- ORDER MANAGEMENT (Escrow Only) ---
     function createOrder(uint256 tokenId, address buyer, uint256 supply) external onlyEscrow returns (uint256) {
         require(isProductListed[tokenId], "Not listed");
         ListingProduct memory listing = listedProduct[tokenId];
-        address merchant = listing.merchant;
-
-        require(balanceOf(merchant, tokenId) - reservedSupply[tokenId] >= supply, "Insufficient supply");
+        require(balanceOf(listing.merchant, tokenId) - reservedSupply[tokenId] >= supply, "Low supply");
 
         reservedSupply[tokenId] += supply;
         uint256 totalPrice = listing.price * supply;
         uint256 orderId = ++_nextOrderId;
+        string memory pType = mintedProduct[tokenId].productType;
 
         orderListed[orderId] = Order({
             tokenId: tokenId,
+            productType: pType,
             supply: supply,
             price: totalPrice,
-            merchant: merchant,
-            buyer: buyer
+            merchant: listing.merchant,
+            buyer: buyer,
+            createdAt: block.timestamp,
+            releasedAt: 0,
+            cancelledAt: 0,
+            deliveryStatus: DeliveryStatus.Pending,
+            deliveryUpdatedAt: 0,
+            deliveryConfirmedAt: 0
         });
 
-        emit OrderCreated(orderId, tokenId, buyer, supply, totalPrice, merchant);
+        emit OrderCreated(orderId, tokenId, buyer, supply, totalPrice, listing.merchant);
         return orderId;
     }
 
     function releaseOrder(uint256 orderId) external onlyEscrow {
         Order storage ord = orderListed[orderId];
-        require(ord.buyer != address(0), "Invalid order");
-        require(!isOrderRedeemed[orderId], "Already redeemed");
+        require(ord.buyer != address(0), "Invalid");
+        require(ord.releasedAt == 0 && ord.cancelledAt == 0, "Processed");
 
         reservedSupply[ord.tokenId] -= ord.supply;
         _safeTransferFrom(ord.merchant, ord.buyer, ord.tokenId, ord.supply, "");
-        isOrderRedeemed[orderId] = true;
+        ord.releasedAt = block.timestamp;
 
         emit OrderReleased(orderId);
     }
 
     function cancelOrder(uint256 orderId) external onlyEscrow {
         Order storage ord = orderListed[orderId];
-        require(ord.buyer != address(0), "Invalid order");
-        require(!isOrderRedeemed[orderId], "Already redeemed");
+        require(ord.buyer != address(0), "Invalid");
+        require(ord.releasedAt == 0 && ord.cancelledAt == 0, "Processed");
 
         reservedSupply[ord.tokenId] -= ord.supply;
-        delete orderListed[orderId];
+        ord.cancelledAt = block.timestamp;
 
         emit OrderCancelled(orderId);
     }
 
-    // --- ERC1155 OVERRIDES ---
-    function uri(uint256 tokenId)
-        public
-        view
-        override(ERC1155URIStorage)
-        returns (string memory)
-    {
+    function updateDeliveryStatus(uint256 orderId, uint8 status) external onlyEscrow {
+        Order storage ord = orderListed[orderId];
+        require(ord.buyer != address(0), "Invalid");
+        require(keccak256(bytes(ord.productType)) == keccak256(bytes("physical")), "Not physical");
+        require(ord.releasedAt == 0 && ord.cancelledAt == 0, "Closed");
+        require(status <= uint8(DeliveryStatus.Failed), "Invalid status");
+
+        ord.deliveryStatus = DeliveryStatus(status);
+        ord.deliveryUpdatedAt = block.timestamp;
+
+        emit DeliveryUpdated(orderId, DeliveryStatus(status), block.timestamp);
+    }
+
+    function confirmDelivery(uint256 orderId) external onlyEscrow {
+        Order storage ord = orderListed[orderId];
+        require(ord.buyer != address(0), "Invalid");
+        require(keccak256(bytes(ord.productType)) == keccak256(bytes("physical")), "Not physical");
+        require(ord.deliveryStatus == DeliveryStatus.InTransit, "Not in transit");
+        require(ord.deliveryConfirmedAt == 0, "Confirmed");
+
+        ord.deliveryStatus = DeliveryStatus.Delivered;
+        ord.deliveryConfirmedAt = block.timestamp;
+
+        emit DeliveryConfirmed(orderId, block.timestamp);
+    }
+
+    function uri(uint256 tokenId) public view override(ERC1155URIStorage) returns (string memory) {
         return super.uri(tokenId);
     }
 
-    // ✅ FIXED override clause
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC1155)
-        returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceId) public view override(ERC1155) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }

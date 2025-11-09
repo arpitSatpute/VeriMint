@@ -1,29 +1,44 @@
-pragma solidity ^0.8.17;
+// script/Deploy.s.sol
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.27;
 
-import "../lib/forge-std/src/Script.sol";
-import "../contracts/src/MultiProduct.sol";
-import "../contracts/src/EscrowMultiProduct.sol";
+import "forge-std/Script.sol";
+import "../src/main/MultiProduct.sol";
+import "../src/main/EscrowMultiProduct.sol";
 
 contract Deploy is Script {
-    function run() external {
-        uint256 pk = vm.envUint("PRIVATE_KEY"); // set PRIVATE_KEY in env
-        string memory rpc = vm.envString("RPC_URL"); // optional, used by forge when broadcasting
+    MultiProduct public multiProduct;
+    EscrowMultiProduct public escrow;
 
-        vm.startBroadcast(pk);
+    function run() external {
+        // Load private key
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+
+        console.log("Deploying from:", deployer);
+        console.log("Network:", block.chainid);
+
+        vm.startBroadcast(deployerPrivateKey);
 
         // Deploy MultiProduct
-        MultiProduct multi = new MultiProduct();
+        multiProduct = new MultiProduct();
+        console.log("MultiProduct deployed at:", address(multiProduct));
 
-        // Deploy Escrow and point to MultiProduct
-        EscrowMultiProduct escrow = new EscrowMultiProduct(address(multi));
+        // Deploy Escrow with MultiProduct address
+        escrow = new EscrowMultiProduct(address(multiProduct));
+        console.log("EscrowMultiProduct deployed at:", address(escrow));
 
-        // Set escrow address in MultiProduct
-        multi.setEscrowAddress(address(escrow));
+        // Link Escrow to MultiProduct
+        multiProduct.setEscrowAddress(address(escrow));
+        console.log("Escrow address set in MultiProduct");
 
         vm.stopBroadcast();
 
-        // Log deployed addresses (foundry will also print tx info)
-        console.log("MultiProduct deployed at:", address(multi));
-        console.log("EscrowMultiProduct deployed at:", address(escrow));
+        // Final output
+        console.log("\nDEPLOYMENT COMPLETE");
+        console.log("========================================");
+        console.log("MultiProduct:     ", address(multiProduct));
+        console.log("EscrowMultiProduct:", address(escrow));
+        console.log("========================================");
     }
 }
