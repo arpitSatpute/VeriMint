@@ -1,7 +1,7 @@
 import { motion } from "framer-motion"
 import { useState, type ChangeEvent, type FormEvent, type ComponentType, type InputHTMLAttributes } from "react"
 import { ShoppingCart, Hash, Layers, MapPin, CheckCircle, AlertCircle } from "lucide-react"
-
+import  DefaultLayout from "@/layouts/default";
 
 type ElegantShapeProps = {
   className?: string;
@@ -197,6 +197,7 @@ export default function CreateOrderForm() {
   const totalPrice = (parseFloat(nftData.price) * (parseInt(formData.quantity, 10) || 0)).toFixed(3)
 
   return (
+    <DefaultLayout>
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
@@ -473,5 +474,6 @@ export default function CreateOrderForm() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
     </div>
+    </DefaultLayout>
   )
 }

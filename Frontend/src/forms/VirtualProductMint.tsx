@@ -1,6 +1,7 @@
 import { motion } from "framer-motion"
 import { useState, type SelectHTMLAttributes, type ComponentType, type TextareaHTMLAttributes, type InputHTMLAttributes, type ChangeEvent, type FormEvent } from "react"
 import { Upload, X, DollarSign, Layers, FileText, Tag, Sparkles, Image as ImageIcon, File } from "lucide-react"
+import DefaultLayout from "@/layouts/default";
 
 
 type ElegantShapeProps = {
@@ -199,6 +200,7 @@ export default function VirtualProductMint() {
   }
 
   return (
+    <DefaultLayout>
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
@@ -484,21 +486,7 @@ export default function VirtualProductMint() {
                 placeholder="https://your-website.com"
               />
 
-              <FormInput
-                label="Royalties (%)"
-                icon={DollarSign}
-                name="royalties"
-                value={formData.royalties}
-                onChange={handleInputChange}
-                type="number"
-                min="0"
-                max="50"
-                step="0.5"
-                placeholder="e.g., 10"
-              />
-              <p className="text-xs text-white/40">
-                Suggested: 10%. You'll receive this percentage on all future sales
-              </p>
+              
             </div>
 
             {/* Action Buttons */}
@@ -527,5 +515,6 @@ export default function VirtualProductMint() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
     </div>
+    </DefaultLayout>
   )
 }

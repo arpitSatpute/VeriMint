@@ -1,7 +1,12 @@
 import { motion } from "framer-motion"
 import React, { useState } from "react"
 import { Upload, X, Calendar, Package, Hash, DollarSign, Layers, FileText, CheckCircle, Tag } from "lucide-react"
-
+import axios from "axios";
+import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { config } from "@/config/config";
+import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import { parseEther } from "viem";
+import DefaultLayout from "@/layouts/default";
 
 type ElegantShapeProps = {
   className?: string;
@@ -128,42 +133,132 @@ function FormSelect({ label, icon: Icon, required, options, ...props }: FormSele
 }
 
 interface FormDataType {
-  name: string
-  description: string
-  productDetails: string
   identityNumber: string
   batchNumber: string
   manufacturingDate: string
   expiryDate: string
-  price: string
-  supply: string
-  category: string
-  condition: string
   weight: string
   dimensions: string
   shippingInfo: string
   warranty: string
+  name: string
+  description: string
+  price: string
+  supply: string
 }
 
 export default function PhysicalProductMint() {
+
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const pinataJWT = import.meta.env.VITE_PINATA_JWT;
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
+
   const [formData, setFormData] = useState<FormDataType>({
-    name: '',
-    description: '',
-    productDetails: '',
     identityNumber: '',
     batchNumber: '',
     manufacturingDate: '',
     expiryDate: '',
-    price: '',
-    supply: '',
-    category: 'electronics',
-    condition: 'new',
     weight: '',
     dimensions: '',
     shippingInfo: '',
     warranty: '',
+    name: '',
+    description: '',
+    price: '',
+    supply: '',
   })
+
+  // FIXED uploadToIPFS
+  const uploadImageToIPFS = async (): Promise<{ cid: string; url: string } | null> => {
+    if (!imagePreview) return null;
+
+    try {
+      // Convert data URL (base64) to File if needed
+      let file: File;
+      if (imagePreview.startsWith("data:")) {
+        const [header, data] = imagePreview.split(",");
+        const mime = header.match(/data:(.*);base64/)?.[1] || "image/png";
+        const binary = atob(data);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+        file = new File([array], "image.png", { type: mime });
+      } else {
+        // If it's already a URL, cannot pin without original file
+        console.warn("No raw file available to pin.");
+        return null;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file); // Pinata expects a file field
+
+      const response = await axios.post(
+        "https://api.pinata.cloud/pinning/pinFileToIPFS",
+        formData,
+        {
+          maxBodyLength: Infinity,
+          headers: {
+            Authorization: `Bearer ${pinataJWT}`,
+          },
+        }
+      );
+
+      const cid: string = response.data.IpfsHash;
+      console.log(cid);
+      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+    } catch (err) {
+      console.error("IPFS upload failed:", err);
+      return null;
+    }
+  }
+
+
+  // Upload NFT metadata JSON to IPFS via Pinata
+  const uploadJsonToIPFS = async (imageCid: string): Promise<{ cid: string; url: string } | null> => {
+    try {
+      const metadata = {
+        name: formData.name || 'Product',
+        description: formData.description || '',
+        image: `ipfs://${imageCid}`,
+        external_url: 'https://verimint.app',
+        attributes: [
+          { trait_type: 'Type', value: 'Physical' },
+          { trait_type: 'Identity Number', value: formData.identityNumber },
+          { trait_type: 'Batch Number', value: formData.batchNumber },
+          { trait_type: 'Manufacturing Date', value: formData.manufacturingDate },
+          { trait_type: 'Expiry Date', value: formData.expiryDate },
+          { trait_type: 'Weight', value: formData.weight },
+          { trait_type: 'Dimensions', value: formData.dimensions },
+          { trait_type: 'Shipping Info', value: formData.shippingInfo },
+          { trait_type: 'Warranty', value: formData.warranty },
+          { trait_type: 'Price (ETH)', value: formData.price },
+          { trait_type: 'Total Supply', value: formData.supply },
+        ].filter(a => a.value && String(a.value).length > 0),
+      }
+
+      const body = {
+        pinataOptions: { cidVersion: 1 },
+        pinataMetadata: { name: `verimint_${metadata.name}_${Date.now()}` },
+        pinataContent: metadata,
+      }
+
+      const res = await axios.post(
+        'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+        body,
+        {
+          headers: {
+            Authorization: `Bearer ${pinataJWT}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      const cid: string = res.data.IpfsHash
+      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
+    } catch (e) {
+      console.error('JSON upload failed:', e)
+      return null
+    }
+  }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -184,10 +279,37 @@ export default function PhysicalProductMint() {
     }))
   }
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Make submit upload image first, then JSON
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    console.log('Form Data:', formData)
-    alert('Minting Physical Product NFT...')
+    const img = await uploadImageToIPFS()
+    if (!img) return alert('Image upload failed')
+    const meta = await uploadJsonToIPFS(img.cid)
+    if (!meta) return alert('Metadata upload failed')
+    console.log('Metadata CID:', meta.cid, 'URL:', meta.url)
+    // alert('Metadata uploaded to IPFS!')
+
+    const txHash = await writeContract(config, {
+      address: MULTI_PRODUCT_ADDRESS,
+      abi: MULTI_PRODUCT_ABI,
+      functionName: "mintProductNft",
+      args: [
+        formData.supply,
+        parseEther(formData.price),
+        formData.name,
+        formData.description,
+        "physical",
+        meta.cid
+      ]
+    });
+
+    const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+    if (receipt.status === "success") {
+      console.log("Success")
+    } else {
+      console.log("Error");
+    }
+
   }
 
   const handleCancel = () => {
@@ -197,6 +319,7 @@ export default function PhysicalProductMint() {
   }
 
   return (
+    <DefaultLayout>
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
@@ -305,25 +428,7 @@ export default function PhysicalProductMint() {
                   onChange={handleInputChange}
                   placeholder="e.g., Premium Leather Wallet"
                   required
-                />
-                <FormSelect
-                  label="Category"
-                  icon={Layers as IconType}
-                  name="category"
-                  value={formData.category}
-                  onChange={handleInputChange}
-                  options={[
-                    { value: 'electronics', label: 'Electronics' },
-                    { value: 'fashion', label: 'Fashion & Apparel' },
-                    { value: 'collectibles', label: 'Collectibles' },
-                    { value: 'art', label: 'Art & Crafts' },
-                    { value: 'jewelry', label: 'Jewelry' },
-                    { value: 'home', label: 'Home & Living' },
-                    { value: 'sports', label: 'Sports & Outdoors' },
-                    { value: 'other', label: 'Other' },
-                  ]}
-                  required
-                />
+                />                
               </div>
 
               <FormTextarea
@@ -334,17 +439,6 @@ export default function PhysicalProductMint() {
                 onChange={handleInputChange}
                 placeholder="Provide a detailed description of your product..."
                 rows={4}
-                required
-              />
-
-              <FormTextarea
-                label="Product Details"
-                icon={Package as IconType}
-                name="productDetails"
-                value={formData.productDetails}
-                onChange={handleInputChange}
-                placeholder="Include specifications, features, materials, etc..."
-                rows={3}
                 required
               />
             </div>
@@ -442,21 +536,7 @@ export default function PhysicalProductMint() {
                 Physical Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormSelect
-                  label="Condition"
-                  icon={CheckCircle as IconType}
-                  name="condition"
-                  value={formData.condition}
-                  onChange={handleInputChange}
-                  options={[
-                    { value: 'new', label: 'New' },
-                    { value: 'like-new', label: 'Like New' },
-                    { value: 'excellent', label: 'Excellent' },
-                    { value: 'good', label: 'Good' },
-                    { value: 'fair', label: 'Fair' },
-                  ]}
-                  required
-                />
+
                 <FormInput
                   label="Weight"
                   icon={Package as IconType}
@@ -474,16 +554,6 @@ export default function PhysicalProductMint() {
                 value={formData.dimensions}
                 onChange={handleInputChange}
                 placeholder="e.g., 20cm x 15cm x 5cm"
-              />
-
-              <FormTextarea
-                label="Shipping Information"
-                icon={Package as IconType}
-                name="shippingInfo"
-                value={formData.shippingInfo}
-                onChange={handleInputChange}
-                placeholder="Provide shipping details, estimated delivery time, etc..."
-                rows={2}
               />
 
               <FormInput
@@ -522,5 +592,6 @@ export default function PhysicalProductMint() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
     </div>
+    </DefaultLayout>
   )
 }

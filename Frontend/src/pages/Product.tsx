@@ -1,7 +1,12 @@
-import DefaultLayout from "@/layouts/default"
-import { motion } from "framer-motion"
-import { useState } from "react"
-import { Search, X } from "lucide-react"
+import DefaultLayout from "@/layouts/default";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { Search, X } from "lucide-react";
+import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import ESCROW_MULTI_PRODUCT_ABI from "@/abis/escrowMultiProduct.json";
+import { readContract, writeContract } from "wagmi/actions";
+import { config } from "@/config/config";
+
 
 type ElegantShapeProps = {
   className?: string
@@ -49,12 +54,22 @@ type NFTCardProps = {
     type: string
     tokenId: string
     image: string
+    description: string
   }
   index?: number
 }
 
 function NFTCard({ nft, index }: NFTCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const MAX_DESCRIPTION_LENGTH = 200;
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
+  const ESCROW_MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS;
+  const [tokenUri, setTokenUri] = useState("");
+
+
+  const truncateDescription = (text: string, limit: number) => {
+    return text.length > limit ? text.substring(0, limit) + "..." : text
+  }
 
   return (
     <motion.div
@@ -97,6 +112,18 @@ function NFTCard({ nft, index }: NFTCardProps) {
             transition={{ duration: 0.3 }}
             className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
           />
+
+          {/* Description Overlay on Hover */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 10 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 flex items-center justify-center p-4"
+          >
+            <p className="text-sm text-white/80 text-center line-clamp-3">
+              {truncateDescription(nft.description, MAX_DESCRIPTION_LENGTH)}
+            </p>
+          </motion.div>
         </div>
 
         <div className="p-5 space-y-3">
@@ -133,6 +160,25 @@ function NFTCard({ nft, index }: NFTCardProps) {
 export default function NFTMarketplace() {
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [nft, setNft] = useState([]);
+  const tokenUri = new Map<number, string>();
+  const [product, setProduct] = useState([]);
+  const [tokenId, setTokenId] = useState();
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
+
+
+  useEffect(() => {
+    
+    const getAllListing = readContract(config, {
+      address: MULTI_PRODUCT_ADDRESS,
+      abi: MULTI_PRODUCT_ABI,
+      functionName: "getAllListing",
+    })
+    
+
+    console.log("Product Data: ", getAllListing);
+    
+  })
 
   const nfts = [
     {
@@ -141,7 +187,8 @@ export default function NFTMarketplace() {
       price: "2.5",
       type: "Virtual",
       tokenId: "1001",
-      image: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=500&h=500&fit=crop"
+      image: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=500&h=500&fit=crop",
+      description: "A mesmerizing digital artwork depicting cosmic wonders and ethereal dreams blending reality with imagination."
     },
     {
       id: 2,
@@ -149,7 +196,8 @@ export default function NFTMarketplace() {
       price: "1.8",
       type: "Physical",
       tokenId: "1002",
-      image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&h=500&fit=crop"
+      image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&h=500&fit=crop",
+      description: "Limited edition physical sculpture combining modern abstract art with traditional craftsmanship techniques."
     },
     {
       id: 3,
@@ -157,7 +205,8 @@ export default function NFTMarketplace() {
       price: "3.2",
       type: "Virtual",
       tokenId: "1003",
-      image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&h=500&fit=crop"
+      image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&h=500&fit=crop",
+      description: "A groundbreaking digital piece that captures the very essence of existence through algorithmic beauty."
     },
     {
       id: 4,
@@ -165,7 +214,8 @@ export default function NFTMarketplace() {
       price: "4.1",
       type: "Virtual",
       tokenId: "1004",
-      image: "https://images.unsplash.com/photo-1635322966219-b75ed372eb01?w=500&h=500&fit=crop"
+      image: "https://images.unsplash.com/photo-1635322966219-b75ed372eb01?w=500&h=500&fit=crop",
+      description: "Vibrant neon-inspired digital art showcasing futuristic themes with cutting-edge visual effects."
     },
     {
       id: 5,
@@ -173,7 +223,8 @@ export default function NFTMarketplace() {
       price: "5.5",
       type: "Physical",
       tokenId: "1005",
-      image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=500&h=500&fit=crop"
+      image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=500&h=500&fit=crop",
+      description: "Hand-crafted physical sculpture with intricate details, representing the intersection of art and soul."
     },
     {
       id: 6,
@@ -181,7 +232,8 @@ export default function NFTMarketplace() {
       price: "2.9",
       type: "Virtual",
       tokenId: "1006",
-      image: "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=500&h=500&fit=crop"
+      image: "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=500&h=500&fit=crop",
+      description: "Retro-inspired pixel art celebrating the golden age of digital creativity with modern twists."
     }
   ]
 
