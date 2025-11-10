@@ -2,7 +2,11 @@ import { motion } from "framer-motion"
 import { useState, type SelectHTMLAttributes, type ComponentType, type TextareaHTMLAttributes, type InputHTMLAttributes, type ChangeEvent, type FormEvent } from "react"
 import { Upload, X, DollarSign, Layers, FileText, Tag, Sparkles, Image as ImageIcon, File } from "lucide-react"
 import DefaultLayout from "@/layouts/default";
-
+import axios from "axios";
+import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { config } from "@/config/config";
+import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import { parseEther } from "viem"; 
 
 type ElegantShapeProps = {
   className?: string;
@@ -136,11 +140,13 @@ interface FormDataType {
   properties: string
   unlockableContent: string
   externalLink: string
-  royalties: string
 }
 
 export default function VirtualProductMint() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const pinataJWT = import.meta.env.VITE_PINATA_JWT;
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
+ 
   const [fileInfo, setFileInfo] = useState<FileInfoType | null>(null)
   const [formData, setFormData] = useState<FormDataType>({
     name: '',
@@ -153,8 +159,95 @@ export default function VirtualProductMint() {
     properties: '',
     unlockableContent: '',
     externalLink: '',
-    royalties: '10',
   })
+
+  const uploadImageToIPFS = async (): Promise<{ cid: string; url: string } | null> => {
+      if (!imagePreview) return null;
+  
+      try {
+        // Convert data URL (base64) to Blob if needed
+                let blob: Blob | null = null;
+                if (imagePreview.startsWith("data:")) {
+                  const [header, data] = imagePreview.split(",");
+                  const mime = header.match(/data:(.*);base64/)?.[1] || "image/png";
+                  const binary = atob(data);
+                  const array = new Uint8Array(binary.length);
+                  for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+                  blob = new Blob([array], { type: mime });
+                } else {
+                  // If it's already a URL, cannot pin without original file
+                  console.warn("No raw file available to pin.");
+                  return null;
+                }
+          
+                const formData = new FormData();
+                // append a blob with a filename so Pinata receives a proper file entry
+                formData.append("file", blob, "image.png"); // Pinata expects a file field
+  
+        const response = await axios.post(
+          "https://api.pinata.cloud/pinning/pinFileToIPFS",
+          formData,
+          {
+            maxBodyLength: Infinity,
+            headers: {
+              Authorization: `Bearer ${pinataJWT}`,
+            },
+          }
+        );
+  
+        const cid: string = response.data.IpfsHash;
+        console.log(cid);
+        return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+      } catch (err) {
+        console.error("IPFS upload failed:", err);
+        return null;
+      }
+    }
+  
+  
+    // Upload NFT metadata JSON to IPFS via Pinata
+    const uploadJsonToIPFS = async (imageCid: string): Promise<{ cid: string; url: string } | null> => {
+      try {
+        const metadata = {
+          name: formData.name || 'Product',
+          description: formData.description || '',
+          image: `ipfs://${imageCid}`,
+          attributes: [
+            { trait_type: 'Type', value: 'virtual' },
+            { trait_type: 'Category', value: formData.category },
+            { trait_type: 'Rarity', value: formData.rarity },
+            { trait_type: 'Collection Name', value: formData.collection },
+            { trait_type: 'Properties', value: formData.properties },
+            { trait_type: 'Unlock Content', value: formData.unlockableContent },
+            { trait_type: 'Price (ETH)', value: formData.price },
+            { trait_type: 'Total Supply', value: formData.supply },
+          ].filter(a => a.value && String(a.value).length > 0),
+        }
+  
+        const body = {
+          pinataOptions: { cidVersion: 1 },
+          pinataMetadata: { name: `verimint_${metadata.name}_${Date.now()}` },
+          pinataContent: metadata,
+        }
+  
+        const res = await axios.post(
+          'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+          body,
+          {
+            headers: {
+              Authorization: `Bearer ${pinataJWT}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        )
+  
+        const cid: string = res.data.IpfsHash
+        return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
+      } catch (e) {
+        console.error('JSON upload failed:', e)
+        return null
+      }
+    }
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -186,12 +279,38 @@ export default function VirtualProductMint() {
     }))
   }
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    console.log('Form Data:', formData)
-    console.log('File Info:', fileInfo)
-    alert('Minting Virtual Product NFT...')
+    const img = await uploadImageToIPFS()
+    if (!img) return alert('Image upload failed')
+    const meta = await uploadJsonToIPFS(img.cid)
+    if (!meta) return alert('Metadata upload failed')
+    console.log('Metadata CID:', meta.cid, 'URL:', meta.url)
+    // alert('Metadata uploaded to IPFS!')
+
+    const txHash = await writeContract(config, {
+      address: MULTI_PRODUCT_ADDRESS,
+      abi: MULTI_PRODUCT_ABI,
+      functionName: "mintProductNft",
+      args: [
+        formData.supply,
+        parseEther(formData.price),
+        formData.name,
+        formData.description,
+        "virtual",
+        meta.cid
+      ]
+    });
+
+    const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+    if (receipt.status === "success") {
+      console.log("Success")
+    } else {
+      console.log("Error");
+    }
+
   }
+
 
   const handleCancel = () => {
     if (confirm('Are you sure you want to cancel? All data will be lost.')) {

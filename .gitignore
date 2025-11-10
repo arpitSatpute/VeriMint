@@ -52,6 +52,11 @@ lerna-debug.log*
 .env.*.local
 .env.production.local
 
+**/.env
+**/.env.local
+**/.env.*.local
+**/.env.production.local
+
 # IDE & Editor
 .vscode/
 .idea/

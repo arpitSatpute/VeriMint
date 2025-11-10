@@ -219,9 +219,8 @@ export default function PhysicalProductMint() {
         name: formData.name || 'Product',
         description: formData.description || '',
         image: `ipfs://${imageCid}`,
-        external_url: 'https://verimint.app',
         attributes: [
-          { trait_type: 'Type', value: 'Physical' },
+          { trait_type: 'Type', value: 'physical' },
           { trait_type: 'Identity Number', value: formData.identityNumber },
           { trait_type: 'Batch Number', value: formData.batchNumber },
           { trait_type: 'Manufacturing Date', value: formData.manufacturingDate },
