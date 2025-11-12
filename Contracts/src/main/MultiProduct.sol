@@ -130,8 +130,8 @@ contract MultiProduct is Ownable, ERC1155URIStorage {
         emit ProductListed(tokenId, msg.sender, p.price, block.timestamp);
     }
 
-    function getUnlistedProductsMerchant() external view returns (uint256[] memory) {
-        uint256[] memory products = merchantProducts[msg.sender];
+    function getUnlistedProductsMerchant(address merchant) external view returns (uint256[] memory) {
+        uint256[] memory products = merchantProducts[merchant];
         uint256[] memory result = new uint256[](products.length);
         uint256 count = 0;
         for (uint256 i = 0; i < products.length; i++) {
