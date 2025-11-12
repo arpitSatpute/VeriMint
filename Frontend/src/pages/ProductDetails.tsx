@@ -1,6 +1,11 @@
 import { motion } from "framer-motion"
-import { useState, type ComponentType } from "react"
+import { useState, useEffect } from "react"
+import { useParams } from "react-router-dom"
 import { ShoppingCart, Heart, Share2, ExternalLink, Clock, Package, Hash, Layers, Tag, Sparkles, Calendar, CheckCircle, TrendingUp, User, Eye } from "lucide-react"
+import { readContract } from "wagmi/actions"
+import { config } from "@/config/config"
+import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json"
+import DefaultLayout from "@/layouts/default"
 
 type ElegantShapeProps = {
   className?: string;
@@ -41,7 +46,7 @@ function ElegantShape({ className = '', delay = 0, width = 400, height = 100, ro
 }
 
 interface DetailRowProps {
-  icon?: ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   label: string;
   value: string;
   highlight?: boolean;
@@ -61,201 +66,294 @@ function DetailRow({ icon: Icon, label, value, highlight }: DetailRowProps) {
   )
 }
 
-type RarityType = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-
-interface PropertyCardProps {
+interface NFTMetadata {
   name: string;
-  value: string;
-  rarity: RarityType;
+  description: string;
+  image: string;
+  attributes?: Array<{ trait_type: string; value: string | number }>;
 }
 
-function PropertyCard({ name, value, rarity }: PropertyCardProps) {
-  const rarityColors: Record<RarityType, string> = {
-    common: 'from-gray-500/20 to-gray-600/20 border-gray-500/30',
-    uncommon: 'from-emerald-500/20 to-emerald-600/20 border-emerald-500/30',
-    rare: 'from-indigo-500/20 to-indigo-600/20 border-indigo-500/30',
-    epic: 'from-violet-500/20 to-violet-600/20 border-violet-500/30',
-    legendary: 'from-amber-500/20 to-amber-600/20 border-amber-500/30',
-  }
-
-  return (
-    <div className={`bg-gradient-to-br ${rarityColors[rarity]} border rounded-xl p-4`}>
-      <div className="text-xs text-white/40 uppercase tracking-wide mb-1">{name}</div>
-      <div className="text-base font-semibold text-white/90">{value}</div>
-      <div className="text-xs text-white/50 mt-1 capitalize">{rarity}</div>
-    </div>
-  )
-}
-
-type ActivityType = 'minted' | 'sale' | 'transfer' | 'listed';
-
-interface ActivityItemProps {
-  type: ActivityType;
-  from?: string | null;
-  to?: string | null;
-  price?: string | null;
-  date: string;
-}
-
-function ActivityItem({ type, from, to, price, date }: ActivityItemProps) {
-  const typeConfig: Record<ActivityType, { icon: ComponentType<React.SVGProps<SVGSVGElement>>; color: string; label: string }> = {
-    minted: { icon: Sparkles, color: 'indigo', label: 'Minted' },
-    sale: { icon: ShoppingCart, color: 'emerald', label: 'Sale' },
-    transfer: { icon: TrendingUp, color: 'violet', label: 'Transfer' },
-    listed: { icon: Tag, color: 'amber', label: 'Listed' },
-  }
-
-  const { icon: Icon, color, label } = typeConfig[type]
-
-  return (
-    <div className="flex items-start gap-4 py-4 border-b border-white/[0.06] last:border-0">
-      <div className={`p-2 rounded-lg bg-${color}-500/10 border border-${color}-500/20 shrink-0`}>
-        <Icon className={`w-4 h-4 text-${color}-400`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`text-sm font-medium text-${color}-300`}>{label}</span>
-          {price && (
-            <span className="text-sm font-bold text-white/90">{price} ETH</span>
-          )}
-        </div>
-        <div className="text-xs text-white/40 space-y-0.5">
-          {from && <div>From: <span className="font-mono text-white/60">{from}</span></div>}
-          {to && <div>To: <span className="font-mono text-white/60">{to}</span></div>}
-          <div className="flex items-center gap-1 mt-1">
-            <Clock className="w-3 h-3" />
-            {date}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface CreatorType {
-  name: string;
-  address: string;
-  verified: boolean;
-}
-
-interface OwnerType {
-  name: string;
-  address: string;
-}
-
-interface DetailsType {
-  contractAddress: string;
-  tokenStandard: string;
-  blockchain: string;
-  mintDate: string;
-  royalties: string;
-  views: string;
-  favorites: string;
-}
-
-interface PhysicalType {
-  dimensions: string;
-  weight: string;
-  material: string;
-  condition: string;
-  shipping: string;
-  warranty: string;
-}
-
-interface ActivityHistoryItem {
-  type: ActivityType;
-  from?: string;
-  to?: string | null;
-  price?: string | null;
-  date: string;
-}
-
-interface NFTType {
+interface NFTDetails {
   tokenId: string;
   name: string;
   description: string;
-  type: 'Physical' | 'Virtual';
+  type: string;
   price: string;
   supply: string;
-  maxSupply: string;
   image: string;
   category: string;
-  rarity: RarityType;
-  creator: CreatorType;
-  owner: OwnerType;
-  details: DetailsType;
-  properties: PropertyCardProps[];
-  physical: PhysicalType;
-  activity: ActivityHistoryItem[];
+  merchant: string;
+  contractAddress: string;
+  isListed: boolean;
 }
 
 export default function ProductDetails() {
-  const [liked, setLiked] = useState<boolean>(false)
-  const [activeTab, setActiveTab] = useState<'details' | 'properties' | 'activity'>('details')
+  const { id } = useParams<{ id: string }>();
+  const [liked, setLiked] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'properties' | 'activity'>('details');
+  const [nft, setNft] = useState<NFTDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [metadata, setMetadata] = useState<NFTMetadata | null>(null);
 
-  // Mock NFT data
-  const nft: NFTType = {
-    tokenId: "1002",
-    name: "Abstract Reality Masterpiece",
-    description: "A unique physical art piece that seamlessly blends traditional painting techniques with digital augmentation. Each piece is handcrafted by renowned artist Maria Santos and comes with a certificate of authenticity on the blockchain. The artwork features vibrant colors and abstract patterns that create a mesmerizing visual experience.",
-    type: "Physical",
-    price: "1.8",
-    supply: "12",
-    maxSupply: "50",
-    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&h=800&fit=crop",
-    category: "Art & Collectibles",
-    rarity: "Rare" as RarityType,
-    creator: {
-      name: "Maria Santos",
-      address: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-      verified: true
-    },
-    owner: {
-      name: "ArtCollector.eth",
-      address: "0x8f3CF7ad21CaB27C891e93eE74b14E4D32fF1c67"
-    },
-    details: {
-      contractAddress: "0x495f947276749ce646f68ac8c248420045cb7b5e",
-      tokenStandard: "ERC-1155",
-      blockchain: "Ethereum",
-      mintDate: "November 1, 2025",
-      royalties: "10%",
-      views: "2,847",
-      favorites: "142"
-    },
-    properties: [
-      { name: "Background", value: "Abstract", rarity: "common" },
-      { name: "Style", value: "Contemporary", rarity: "uncommon" },
-      { name: "Medium", value: "Mixed Media", rarity: "rare" },
-      { name: "Frame", value: "Gallery", rarity: "epic" },
-      { name: "Signature", value: "Original", rarity: "legendary" }
-    ],
-    physical: {
-      dimensions: "60cm × 80cm × 5cm",
-      weight: "3.5 kg",
-      material: "Canvas, Acrylic, Digital Enhancement",
-      condition: "New",
-      shipping: "Worldwide shipping available",
-      warranty: "2 years authenticity guarantee"
-    },
-    activity: [
-      { type: 'minted', from: '0x742d...0bEb', to: null, price: null, date: 'Nov 1, 2025' },
-      { type: 'listed', from: '0x742d...0bEb', to: null, price: '1.8', date: 'Nov 2, 2025' },
-      { type: 'sale', from: '0x742d...0bEb', to: '0x8f3C...1c67', price: '1.5', date: 'Nov 3, 2025' },
-      { type: 'transfer', from: '0x8f3C...1c67', to: '0x95aD...4cE', price: null, date: 'Nov 5, 2025' }
-    ]
-  }
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS as `0x${string}`;
+
+  // Log component mount
+  useEffect(() => {
+    console.log("🚀 ProductDetails component mounted");
+    console.log("📍 URL Parameter 'id':", id);
+    console.log("🏭 Contract Address:", MULTI_PRODUCT_ADDRESS);
+    
+    return () => {
+      console.log("🔚 ProductDetails component unmounted");
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log("🔄 useEffect triggered - id changed:", id);
+    
+    if (id) {
+      console.log("✅ ID exists, starting to load NFT details");
+      console.log("🔍 Loading NFT details for Token ID:", id);
+      loadNFTDetails(id);
+    } else {
+      console.log("❌ No ID found in URL params");
+    }
+  }, [id]);
+
+  const loadNFTDetails = async (tokenId: string) => {
+    console.log("\n═══════════════════════════════════════");
+    console.log("📦 STARTING DATA FETCH");
+    console.log("═══════════════════════════════════════");
+    console.log("Token ID:", tokenId);
+    console.log("Token ID Type:", typeof tokenId);
+    console.log("Contract Address:", MULTI_PRODUCT_ADDRESS);
+    console.log("Initial Loading State:", loading);
+    
+    setLoading(true);
+    console.log("⏳ Loading state set to TRUE");
+    
+    try {
+      // 1. Get token URI
+      console.log("\n1️⃣ ═══ STEP 1: Fetching Token URI ═══");
+      console.log("Calling contract function: uri(tokenId)");
+      console.log("Args:", [BigInt(tokenId)]);
+      
+      const uri = (await readContract(config, {
+        address: MULTI_PRODUCT_ADDRESS,
+        abi: MULTI_PRODUCT_ABI,
+        functionName: "uri",
+        args: [BigInt(tokenId)],
+      })) as string;
+      
+      console.log("✅ Token URI received:", uri);
+      console.log("URI Type:", typeof uri);
+      console.log("URI Length:", uri.length);
+
+      // 2. Check if product is listed
+      console.log("\n2️⃣ ═══ STEP 2: Checking Product Listing Status ═══");
+      console.log("Calling contract function: isProductListed(tokenId)");
+      
+      const isListed = (await readContract(config, {
+        address: MULTI_PRODUCT_ADDRESS,
+        abi: MULTI_PRODUCT_ABI,
+        functionName: "isProductListed",
+        args: [BigInt(tokenId)],
+      })) as boolean;
+      
+      console.log("✅ Is Listed:", isListed);
+      console.log("Is Listed Type:", typeof isListed);
+
+      // 3. Get product details from contract
+      console.log("\n3️⃣ ═══ STEP 3: Fetching Product from Contract ═══");
+      console.log("Calling contract function: mintedProduct(tokenId)");
+      
+      const product = (await readContract(config, {
+        address: MULTI_PRODUCT_ADDRESS,
+        abi: MULTI_PRODUCT_ABI,
+        functionName: "mintedProduct",
+        args: [BigInt(tokenId)],
+      })) as any;
+      
+      console.log("✅ Contract Product Data:", product);
+      console.log("Product Type:", typeof product);
+      console.log("Product Keys:", product ? Object.keys(product) : "N/A");
+      console.log("Product Merchant:", product?.merchant);
+      console.log("Product Price:", product?.price);
+      console.log("Product Type:", product?.productType);
+
+      // 4. Normalize IPFS URI
+      console.log("\n4️⃣ ═══ STEP 4: Normalizing IPFS URI ═══");
+      console.log("Original URI:", uri);
+      
+      let metadataUrl = uri;
+      if (uri.startsWith("ipfs://")) {
+        metadataUrl = uri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+        console.log("🔄 Converted IPFS protocol to gateway URL");
+      } else if (!uri.startsWith("http")) {
+        metadataUrl = `https://gateway.pinata.cloud/ipfs/${uri}`;
+        console.log("🔄 Added gateway prefix to hash");
+      } else {
+        console.log("✅ URI already uses HTTP(S)");
+      }
+      
+      console.log("✅ Final Metadata URL:", metadataUrl);
+
+      // 5. Fetch JSON metadata
+      console.log("\n5️⃣ ═══ STEP 5: Fetching JSON from IPFS ═══");
+      console.log("Fetching from:", metadataUrl);
+      
+      const response = await fetch(metadataUrl);
+      console.log("Response Status:", response.status);
+      console.log("Response OK:", response.ok);
+      console.log("Response Headers:", Object.fromEntries(response.headers.entries()));
+      
+      if (!response.ok) {
+        console.error("❌ Failed to fetch metadata");
+        console.error("Status:", response.status);
+        console.error("Status Text:", response.statusText);
+        throw new Error(`Failed to fetch metadata: ${response.status} ${response.statusText}`);
+      }
+      
+      const fetchedMetadata: NFTMetadata = await response.json();
+      console.log("✅ Fetched Metadata:", fetchedMetadata);
+      console.log("Metadata Name:", fetchedMetadata.name);
+      console.log("Metadata Description Length:", fetchedMetadata.description?.length);
+      console.log("Metadata Image:", fetchedMetadata.image);
+      console.log("Metadata Attributes Count:", fetchedMetadata.attributes?.length);
+      console.log("Metadata Attributes:", fetchedMetadata.attributes);
+      
+      setMetadata(fetchedMetadata);
+      console.log("✅ Metadata state updated");
+
+      // 6. Normalize image URL
+      console.log("\n6️⃣ ═══ STEP 6: Normalizing Image URL ═══");
+      console.log("Original Image URL:", fetchedMetadata.image);
+      
+      let imageUrl = fetchedMetadata.image || "";
+      if (imageUrl.startsWith("ipfs://")) {
+        imageUrl = imageUrl.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+        console.log("🔄 Converted image IPFS to gateway");
+      }
+      
+      console.log("✅ Final Image URL:", imageUrl);
+
+      // 7. Extract data from attributes and contract
+      console.log("\n7️⃣ ═══ STEP 7: Extracting Attributes ═══");
+      
+      const priceAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Price (ETH)");
+      const typeAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Type");
+      const categoryAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Category");
+      const supplyAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Total Supply");
+      
+      console.log("📊 Extracted Attributes:");
+      console.log("  - Price (ETH):", priceAttr);
+      console.log("  - Type:", typeAttr);
+      console.log("  - Category:", categoryAttr);
+      console.log("  - Total Supply:", supplyAttr);
+
+      const nftData = {
+        tokenId,
+        name: fetchedMetadata.name || `Token #${tokenId}`,
+        description: fetchedMetadata.description || "No description available",
+        image: imageUrl,
+        price: priceAttr?.value?.toString() || product.price?.toString() || "0",
+        supply: supplyAttr?.value?.toString() || "0",
+        type: typeAttr?.value?.toString() || product.productType || "virtual",
+        category: isListed ? "Listed" : "Unlisted", // ✅ Changed from categoryAttr
+        merchant: product.merchant || "Unknown",
+        contractAddress: MULTI_PRODUCT_ADDRESS,
+        isListed,
+      };
+
+      console.log("\n🎯 ═══ FINAL NFT DATA OBJECT ═══");
+      console.log(JSON.stringify(nftData, null, 2));
+      
+      setNft(nftData);
+      console.log("✅ NFT state updated with data");
+      console.log("✅ NFT data loaded successfully!");
+      
+    } catch (error) {
+      console.error("\n❌ ═══ ERROR OCCURRED ═══");
+      console.error("Error Object:", error);
+      console.error("Error Type:", typeof error);
+      console.error("Error Name:", error instanceof Error ? error.name : 'Unknown');
+      console.error("Error Message:", error instanceof Error ? error.message : 'Unknown error');
+      console.error("Error Stack:", error instanceof Error ? error.stack : undefined);
+      
+      if (error instanceof Error) {
+        console.error("Full Error Details:", {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
+      }
+    } finally {
+      console.log("\n🏁 ═══ FINISHING UP ═══");
+      console.log("Setting loading to FALSE");
+      setLoading(false);
+      console.log("Final Loading State:", false);
+      console.log("Final NFT State:", nft);
+      console.log("═══════════════════════════════════════\n");
+    }
+  };
 
   const handleBuyNow = () => {
+    console.log("💳 Buy Now clicked for:", nft?.tokenId);
     alert('Redirecting to purchase page...')
   }
 
   const handleShare = () => {
+    console.log("🔗 Share clicked, copying URL:", window.location.href);
     navigator.clipboard.writeText(window.location.href)
     alert('Link copied to clipboard!')
   }
 
+  // Detailed loading state check
+  console.log("\n🔍 RENDER CYCLE CHECK");
+  console.log("Current loading state:", loading);
+  console.log("Current nft state:", nft ? "Data exists" : "No data");
+  console.log("Current metadata state:", metadata ? "Exists" : "No metadata");
+
+  if (loading) {
+    console.log("⏳ ═══ RENDERING LOADING STATE ═══");
+    console.log("NFT State:", nft);
+    console.log("Metadata State:", metadata);
+    
+    return (
+      <DefaultLayout>
+        <div className="min-h-screen flex items-center justify-center bg-[#030303]">
+          <div className="text-center">
+            <p className="text-white/60 mb-4">Loading product details...</p>
+            <p className="text-white/40 text-sm">Token ID: {id}</p>
+          </div>
+        </div>
+      </DefaultLayout>
+    );
+  }
+
+  if (!nft) {
+    console.log("⚠️ ═══ RENDERING NOT FOUND STATE ═══");
+    console.log("Loading:", loading);
+    console.log("NFT:", nft);
+    
+    return (
+      <DefaultLayout>
+        <div className="min-h-screen flex items-center justify-center bg-[#030303]">
+          <div className="text-center">
+            <p className="text-white/60 mb-4">Product not found</p>
+            <p className="text-white/40 text-sm">Token ID: {id}</p>
+          </div>
+        </div>
+      </DefaultLayout>
+    );
+  }
+
+  console.log("🎨 ═══ RENDERING NFT DETAILS PAGE ═══");
+  console.log("NFT Data:", nft);
+  console.log("Metadata:", metadata);
+
   return (
+    <DefaultLayout>
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
@@ -293,8 +391,8 @@ export default function ProductDetails() {
                   className="w-full aspect-square object-cover"
                 />
                 <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                  <span className={`px-3 py-1.5 rounded-full text-sm font-medium backdrop-blur-md border ${
-                    nft.type === 'Physical' 
+                  <span className={`px-3 py-1.5 rounded-full text-sm font-medium backdrop-blur-md border capitalize ${
+                    nft.type === 'physical' 
                       ? 'bg-rose-500/20 border-rose-500/30 text-rose-200' 
                       : 'bg-indigo-500/20 border-indigo-500/30 text-indigo-200'
                   }`}>
@@ -319,24 +417,31 @@ export default function ProductDetails() {
                     </motion.button>
                   </div>
                 </div>
+                {nft.isListed && (
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2">
+                    <span className="px-3 py-1.5 rounded-full text-sm font-medium backdrop-blur-md border bg-emerald-500/20 border-emerald-500/30 text-emerald-200">
+                      Listed
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Stats Cards */}
               <div className="grid grid-cols-3 gap-3 mt-4">
                 <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 text-center">
-                  <Eye className="w-5 h-5 text-indigo-400 mx-auto mb-2" />
-                  <div className="text-lg font-bold text-white/90">{nft.details.views}</div>
-                  <div className="text-xs text-white/40">Views</div>
-                </div>
-                <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 text-center">
-                  <Heart className="w-5 h-5 text-rose-400 mx-auto mb-2" />
-                  <div className="text-lg font-bold text-white/90">{nft.details.favorites}</div>
-                  <div className="text-xs text-white/40">Favorites</div>
+                  <Hash className="w-5 h-5 text-indigo-400 mx-auto mb-2" />
+                  <div className="text-lg font-bold text-white/90 font-mono">#{nft.tokenId}</div>
+                  <div className="text-xs text-white/40">Token ID</div>
                 </div>
                 <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 text-center">
                   <Layers className="w-5 h-5 text-violet-400 mx-auto mb-2" />
-                  <div className="text-lg font-bold text-white/90">{nft.supply}/{nft.maxSupply}</div>
+                  <div className="text-lg font-bold text-white/90">{nft.supply}</div>
                   <div className="text-xs text-white/40">Supply</div>
+                </div>
+                <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 text-center">
+                  <Tag className="w-5 h-5 text-rose-400 mx-auto mb-2" />
+                  <div className="text-lg font-bold text-white/90">{nft.price}</div>
+                  <div className="text-xs text-white/40">ETH</div>
                 </div>
               </div>
             </div>
@@ -352,12 +457,12 @@ export default function ProductDetails() {
             {/* Title and Price */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-violet-500/10 border border-violet-500/20 text-violet-300">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                  nft.isListed 
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' 
+                    : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                }`}>
                   {nft.category}
-                </span>
-                <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-500/10 border border-amber-500/20 text-amber-300 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  {nft.rarity}
                 </span>
               </div>
 
@@ -391,38 +496,19 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Creator and Owner */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4">
-                <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
-                  <User className="w-3 h-3" />
-                  Creator
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-400 to-rose-400" />
-                  <div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-medium text-white/90">{nft.creator.name}</span>
-                      {nft.creator.verified && (
-                        <CheckCircle className="w-3 h-3 text-indigo-400" />
-                      )}
-                    </div>
-                    <span className="text-xs text-white/40 font-mono">{nft.creator.address.slice(0, 10)}...</span>
-                  </div>
-                </div>
+            {/* Merchant */}
+            <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4">
+              <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
+                <User className="w-3 h-3" />
+                Merchant
               </div>
-
-              <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4">
-                <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
-                  <User className="w-3 h-3" />
-                  Current Owner
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-violet-400 to-amber-400" />
-                  <div>
-                    <div className="text-sm font-medium text-white/90">{nft.owner.name}</div>
-                    <span className="text-xs text-white/40 font-mono">{nft.owner.address.slice(0, 10)}...</span>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-400 to-rose-400" />
+                <div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium text-white/90 font-mono">{nft.merchant.slice(0, 10)}...</span>
                   </div>
+                  <span className="text-xs text-white/40">Product Creator</span>
                 </div>
               </div>
             </div>
@@ -430,17 +516,17 @@ export default function ProductDetails() {
             {/* Tabs */}
             <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden">
               <div className="flex border-b border-white/[0.08]">
-                {(['details', 'properties', 'activity'] as const).map((tab) => (
+                {(['details', 'properties'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`flex-1 px-6 py-4 text-sm font-medium transition-all ${
+                    className={`flex-1 px-6 py-4 text-sm font-medium transition-all capitalize ${
                       activeTab === tab
                         ? 'text-white bg-white/[0.05] border-b-2 border-indigo-500'
                         : 'text-white/50 hover:text-white/70 hover:bg-white/[0.02]'
                     }`}
                   >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    {tab}
                   </button>
                 ))}
               </div>
@@ -456,47 +542,25 @@ export default function ProductDetails() {
                     <div>
                       <h3 className="text-base font-semibold text-white/90 mb-3">Details</h3>
                       <div className="space-y-1">
-                        <DetailRow icon={Hash} label="Contract Address" value={`${nft.details.contractAddress.slice(0, 10)}...${nft.details.contractAddress.slice(-8)}`} highlight={false} />
-                        <DetailRow icon={Package} label="Token Standard" value={nft.details.tokenStandard} highlight={false} />
-                        <DetailRow icon={Tag} label="Blockchain" value={nft.details.blockchain} highlight={false} />
-                        <DetailRow icon={Calendar} label="Mint Date" value={nft.details.mintDate} highlight={false} />
-                        <DetailRow icon={TrendingUp} label="Royalties" value={nft.details.royalties} highlight={true} />
+                        <DetailRow icon={Hash} label="Contract Address" value={`${nft.contractAddress.slice(0, 10)}...${nft.contractAddress.slice(-8)}`} highlight={false} />
+                        <DetailRow icon={Package} label="Token Standard" value="ERC-1155" highlight={false} />
+                        <DetailRow icon={Tag} label="Blockchain" value="Ethereum" highlight={false} />
+                        <DetailRow icon={Layers} label="Supply" value={nft.supply} highlight={false} />
+                        <DetailRow icon={TrendingUp} label="Type" value={nft.type} highlight={true} />
                       </div>
                     </div>
-
-                    {nft.type === 'Physical' && (
-                      <div>
-                        <h3 className="text-base font-semibold text-white/90 mb-3">Physical Details</h3>
-                        <div className="space-y-1">
-                          <DetailRow icon={Package} label="Dimensions" value={nft.physical.dimensions} highlight={false} />
-                          <DetailRow icon={Package} label="Weight" value={nft.physical.weight} highlight={false} />
-                          <DetailRow icon={Tag} label="Material" value={nft.physical.material} highlight={false} />
-                          <DetailRow icon={CheckCircle} label="Condition" value={nft.physical.condition} highlight={false} />
-                          <DetailRow icon={Package} label="Shipping" value={nft.physical.shipping} highlight={false} />
-                          <DetailRow icon={CheckCircle} label="Warranty" value={nft.physical.warranty} highlight={false} />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
-                {activeTab === 'properties' && (
+                {activeTab === 'properties' && metadata?.attributes && (
                   <div>
                     <h3 className="text-base font-semibold text-white/90 mb-4">Properties & Attributes</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {nft.properties.map((prop, i) => (
-                        <PropertyCard key={i} {...prop} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'activity' && (
-                  <div>
-                    <h3 className="text-base font-semibold text-white/90 mb-4">Activity History</h3>
-                    <div className="space-y-2">
-                      {nft.activity.map((item, i) => (
-                        <ActivityItem key={i} {...item} />
+                    <div className="grid grid-cols-2 gap-3">
+                      {metadata.attributes.map((attr, i) => (
+                        <div key={i} className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-4">
+                          <div className="text-xs text-white/40 mb-1">{attr.trait_type}</div>
+                          <div className="text-sm font-semibold text-white/90">{attr.value}</div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -506,7 +570,9 @@ export default function ProductDetails() {
 
             {/* Contract Link */}
             <a
-              href="#"
+              href={`https://etherscan.io/address/${nft.contractAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-sm text-white/60 hover:text-white/90 hover:border-white/[0.15] transition-all"
             >
               <ExternalLink className="w-4 h-4" />
@@ -518,5 +584,6 @@ export default function ProductDetails() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
     </div>
+    </DefaultLayout>
   )
 }

@@ -2,9 +2,9 @@ import DefaultLayout from "@/layouts/default";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
-import ESCROW_MULTI_PRODUCT_ABI from "@/abis/escrowMultiProduct.json";
-import { readContract, writeContract } from "wagmi/actions";
+import { readContract } from "wagmi/actions";
 import { config } from "@/config/config";
 
 
@@ -46,29 +46,47 @@ function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate 
   )
 }
 
+interface NFTMetadata {
+  name: string;
+  description: string;
+  image: string;
+  attributes?: Array<{ trait_type: string; value: string | number }>;
+}
+
+type ListedNFT = {
+  id: number
+  name: string
+  price: string
+  type: string
+  tokenId: string
+  image: string
+  description: string
+  merchant: string
+}
+
 type NFTCardProps = {
-  nft: {
-    id: number
-    name: string
-    price: string
-    type: string
-    tokenId: string
-    image: string
-    description: string
-  }
+  nft: ListedNFT
   index?: number
 }
 
 function NFTCard({ nft, index }: NFTCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const navigate = useNavigate();
   const MAX_DESCRIPTION_LENGTH = 200;
-  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
-  const ESCROW_MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS;
-  const [tokenUri, setTokenUri] = useState("");
-
 
   const truncateDescription = (text: string, limit: number) => {
     return text.length > limit ? text.substring(0, limit) + "..." : text
+  }
+
+  const handleCardClick = () => {
+    console.log("🖱️ NFT Card clicked, navigating to:", `/product/${nft.tokenId}`);
+    navigate(`/productDetails/${nft.tokenId}`);
+  }
+
+  const handleBuyNowClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click when clicking buy button
+    console.log("💳 Buy Now clicked for token:", nft.tokenId);
+    navigate(`/productDetails/${nft.tokenId}`);
   }
 
   return (
@@ -82,12 +100,13 @@ function NFTCard({ nft, index }: NFTCardProps) {
       }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      className="group relative"
+      onClick={handleCardClick}
+      className="group relative cursor-pointer"
     >
       <div className="relative bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden transition-all duration-500 hover:border-white/[0.15] hover:bg-white/[0.04]">
         <div className="relative aspect-square overflow-hidden">
           <motion.img
-            src={nft.image}
+            src={nft.image || "/placeholder.png"}
             alt={nft.name}
             className="w-full h-full object-cover"
             animate={{
@@ -98,11 +117,11 @@ function NFTCard({ nft, index }: NFTCardProps) {
           
           <div className="absolute top-3 right-3">
             <span className={`px-3 py-1 rounded-full text-xs font-medium backdrop-blur-md border ${
-              nft.type === 'Physical' 
+              nft.type === 'physical' 
                 ? 'bg-rose-500/20 border-rose-500/30 text-rose-200' 
                 : 'bg-indigo-500/20 border-indigo-500/30 text-indigo-200'
             }`}>
-              {nft.type}
+              {nft.type === 'physical' ? 'Physical' : 'Virtual'}
             </span>
           </div>
 
@@ -113,7 +132,6 @@ function NFTCard({ nft, index }: NFTCardProps) {
             className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
           />
 
-          {/* Description Overlay on Hover */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 10 }}
@@ -147,6 +165,7 @@ function NFTCard({ nft, index }: NFTCardProps) {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            onClick={handleBuyNowClick}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500/10 to-rose-500/10 border border-white/[0.08] text-white/80 font-medium hover:border-white/[0.15] hover:bg-gradient-to-r hover:from-indigo-500/20 hover:to-rose-500/20 transition-all duration-300"
           >
             View Details
@@ -160,88 +179,96 @@ function NFTCard({ nft, index }: NFTCardProps) {
 export default function NFTMarketplace() {
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-  const [nft, setNft] = useState([]);
-  const tokenUri = new Map<number, string>();
-  const [product, setProduct] = useState([]);
-  const [tokenId, setTokenId] = useState();
-  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
-
+  const [nfts, setNfts] = useState<ListedNFT[]>([])
+  const [loading, setLoading] = useState(false)
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS as `0x${string}`;
 
   useEffect(() => {
-    
-    const getAllListing = readContract(config, {
-      address: MULTI_PRODUCT_ADDRESS,
-      abi: MULTI_PRODUCT_ABI,
-      functionName: "getAllListing",
-    })
-    
+    loadListedNFTs();
+  }, []);
 
-    console.log("Product Data: ", getAllListing);
-    
-  })
+  const loadListedNFTs = async () => {
+    setLoading(true);
 
-  const nfts = [
-    {
-      id: 1,
-      name: "Cosmic Dreams #1",
-      price: "2.5",
-      type: "Virtual",
-      tokenId: "1001",
-      image: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=500&h=500&fit=crop",
-      description: "A mesmerizing digital artwork depicting cosmic wonders and ethereal dreams blending reality with imagination."
-    },
-    {
-      id: 2,
-      name: "Abstract Reality",
-      price: "1.8",
-      type: "Physical",
-      tokenId: "1002",
-      image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&h=500&fit=crop",
-      description: "Limited edition physical sculpture combining modern abstract art with traditional craftsmanship techniques."
-    },
-    {
-      id: 3,
-      name: "Digital Essence",
-      price: "3.2",
-      type: "Virtual",
-      tokenId: "1003",
-      image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&h=500&fit=crop",
-      description: "A groundbreaking digital piece that captures the very essence of existence through algorithmic beauty."
-    },
-    {
-      id: 4,
-      name: "Neon Genesis",
-      price: "4.1",
-      type: "Virtual",
-      tokenId: "1004",
-      image: "https://images.unsplash.com/photo-1635322966219-b75ed372eb01?w=500&h=500&fit=crop",
-      description: "Vibrant neon-inspired digital art showcasing futuristic themes with cutting-edge visual effects."
-    },
-    {
-      id: 5,
-      name: "Ethereal Sculpture",
-      price: "5.5",
-      type: "Physical",
-      tokenId: "1005",
-      image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=500&h=500&fit=crop",
-      description: "Hand-crafted physical sculpture with intricate details, representing the intersection of art and soul."
-    },
-    {
-      id: 6,
-      name: "Pixel Paradise",
-      price: "2.9",
-      type: "Virtual",
-      tokenId: "1006",
-      image: "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=500&h=500&fit=crop",
-      description: "Retro-inspired pixel art celebrating the golden age of digital creativity with modern twists."
+    try {
+      // 1. Get all listed products
+      const [listings, tokenIds, products] = (await readContract(config, {
+        address: MULTI_PRODUCT_ADDRESS,
+        abi: MULTI_PRODUCT_ABI,
+        functionName: "getAllListing",
+      })) as [any[], bigint[], any[]];
+
+      if (!tokenIds || tokenIds.length === 0) {
+        setNfts([]);
+        setLoading(false);
+        return;
+      }
+
+      // 2. For each tokenId, fetch URI and metadata
+      const nftData = await Promise.all(
+        tokenIds.map(async (tid, idx) => {
+          try {
+            // Get token URI
+            const uri = (await readContract(config, {
+              address: MULTI_PRODUCT_ADDRESS,
+              abi: MULTI_PRODUCT_ABI,
+              functionName: "uri",
+              args: [tid],
+            })) as string;
+
+            // Normalize IPFS URI
+            let metadataUrl = uri;
+            if (uri.startsWith("ipfs://")) {
+              metadataUrl = uri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+            } else if (!uri.startsWith("http")) {
+              metadataUrl = `https://gateway.pinata.cloud/ipfs/${uri}`;
+            }
+
+            // Fetch JSON metadata
+            const response = await fetch(metadataUrl);
+            if (!response.ok) throw new Error("Failed to fetch metadata");
+            const metadata: NFTMetadata = await response.json();
+
+            // Normalize image URL
+            let imageUrl = metadata.image || "";
+            if (imageUrl.startsWith("ipfs://")) {
+              imageUrl = imageUrl.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+            }
+
+            // Extract data from attributes
+            const priceAttr = metadata.attributes?.find((a) => a.trait_type === "Price (ETH)");
+            const typeAttr = metadata.attributes?.find((a) => a.trait_type === "Type");
+
+            return {
+              id: idx + 1,
+              tokenId: tid.toString(),
+              name: metadata.name || `Token #${tid}`,
+              description: metadata.description || "No description available",
+              image: imageUrl,
+              price: priceAttr?.value?.toString() || listings[idx].price?.toString() || "0",
+              type: typeAttr?.value?.toString() || "virtual",
+              merchant: listings[idx].merchant,
+            };
+          } catch (err) {
+            console.error(`Failed to load metadata for token ${tid}:`, err);
+            return null;
+          }
+        })
+      );
+
+      setNfts(nftData.filter((n) => n !== null) as ListedNFT[]);
+    } catch (error) {
+      console.error("Failed to load listed NFTs:", error);
+    } finally {
+      setLoading(false);
     }
-  ]
+  };
 
-  const filters = ['All', 'Virtual', 'Physical']
+  const filters = ['All', 'virtual', 'physical']
 
   // Filter by type and search query
   const filteredNfts = nfts.filter(nft => {
-    const matchesType = activeFilter === 'All' || nft.type === activeFilter
+    const matchesType = activeFilter === 'All' || nft.type === activeFilter.toLowerCase()
     const matchesSearch = nft.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           nft.tokenId.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesType && matchesSearch
@@ -288,7 +315,7 @@ export default function NFTMarketplace() {
         >
           <h1 className="text-4xl md:text-6xl font-bold mb-4">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-white/90 to-rose-300">
-              Product Page
+              Product Marketplace
             </span>
           </h1>
           
@@ -296,9 +323,7 @@ export default function NFTMarketplace() {
             Discover unique digital and physical assets on the ERC-1155 powered marketplace
           </p>
 
-          {/* Search Bar & Filter Container - Horizontal Layout */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* Filter Buttons - Left Side */}
             <div className="flex items-center gap-3 flex-wrap">
               {filters.map((filter) => (
                 <motion.button
@@ -306,7 +331,7 @@ export default function NFTMarketplace() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setActiveFilter(filter)}
-                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 capitalize ${
                     activeFilter === filter
                       ? 'bg-gradient-to-r from-indigo-500/20 to-rose-500/20 border-2 border-white/[0.15] text-white'
                       : 'bg-white/[0.02] border border-white/[0.08] text-white/60 hover:text-white/80 hover:border-white/[0.12]'
@@ -317,7 +342,6 @@ export default function NFTMarketplace() {
               ))}
             </div>
 
-            {/* Search Bar - Right Side */}
             <div className="w-full md:w-80">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
@@ -340,7 +364,6 @@ export default function NFTMarketplace() {
             </div>
           </div>
 
-          {/* Results count */}
           {searchQuery && (
             <p className="text-sm text-white/40 mt-4">
               Found {filteredNfts.length} result{filteredNfts.length !== 1 ? 's' : ''}
@@ -348,8 +371,11 @@ export default function NFTMarketplace() {
           )}
         </motion.div>
 
-        {/* NFT Grid */}
-        {filteredNfts.length > 0 ? (
+        {loading ? (
+          <div className="text-center py-12 text-white/40">
+            Loading products...
+          </div>
+        ) : filteredNfts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {filteredNfts.map((nft, index) => (
               <NFTCard key={nft.id} nft={nft} index={index} />

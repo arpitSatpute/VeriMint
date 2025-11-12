@@ -32,7 +32,7 @@ function App() {
             <Route element={<PhysicalProductMint />} path="/physicalMint" />
             <Route element={<VirtualProductMint />} path="/virtualMint" />
             <Route element={<CreateOrderForm />} path="/createOrder" />
-            <Route element={<ProductDetails />} path="/productDetails/:token" />
+            <Route element={<ProductDetails />} path="/productDetails/:id" />
           </Routes>
         </QueryClientProvider>
       </ThirdwebProvider>

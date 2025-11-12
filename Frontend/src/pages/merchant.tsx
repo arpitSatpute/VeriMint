@@ -1,8 +1,12 @@
 import { motion, AnimatePresence } from "framer-motion"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, Flame, XCircle, ShoppingCart, Eye, EyeOff, Package, Zap, Sparkles, X, CheckCircle } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import DefaultLayout from "@/layouts/default"
+import { useAccount } from "wagmi";
+import { readContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { config } from "@/config/config";
+import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
 
 type ElegantShapeProps = {
   className?: string;
@@ -40,6 +44,13 @@ function ElegantShape({ className = '', delay = 0, width = 400, height = 100, ro
       </motion.div>
     </motion.div>
   )
+}
+
+interface NFTMetadata {
+  name: string;
+  description: string;
+  image: string;
+  attributes?: Array<{ trait_type: string; value: string | number }>;
 }
 
 type MerchantNFT = {
@@ -87,7 +98,7 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
       <div className="relative bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden transition-all duration-500 hover:border-white/[0.15] hover:bg-white/[0.04]">
         <div className="relative aspect-square overflow-hidden">
           <motion.img
-            src={nft.image}
+            src={nft.image || "/placeholder.png"}
             alt={nft.name}
             className="w-full h-full object-cover"
             animate={{
@@ -98,11 +109,11 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
           
           <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
             <span className={`px-3 py-1 rounded-full text-xs font-medium backdrop-blur-md border ${
-              nft.type === 'Physical' 
+              nft.type === 'physical' 
                 ? 'bg-rose-500/20 border-rose-500/30 text-rose-200' 
                 : 'bg-indigo-500/20 border-indigo-500/30 text-indigo-200'
             }`}>
-              {nft.type}
+              {nft.type === 'physical' ? 'Physical' : 'Virtual'}
             </span>
 
             {nft.isListed && (
@@ -121,7 +132,7 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
                 transition={{ duration: 0.3 }}
                 className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-4 flex flex-col justify-end"
               >
-                <p className="text-white/80 text-sm leading-relaxed">
+                <p className="text-white/80 text-sm leading-relaxed line-clamp-4">
                   {nft.description}
                 </p>
               </motion.div>
@@ -211,92 +222,179 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
 }
 
 export default function MerchantDashboard() {
+  const { address } = useAccount();
+  const [nfts, setNfts] = useState<MerchantNFT[]>([]);
+  const [loading, setLoading] = useState(false);
   const [activeView, setActiveView] = useState('all')
   const [showMintModal, setShowMintModal] = useState(false)
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  const nfts = [
-    {
-      id: 1,
-      name: "Cosmic Dreams Collection",
-      price: "2.5",
-      type: "Virtual",
-      tokenId: "1001",
-      supply: "45/100",
-      image: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=500&h=500&fit=crop",
-      description: "A mesmerizing collection of cosmic artworks featuring nebulas, galaxies, and celestial phenomena captured in stunning detail.",
-      isListed: true
-    },
-    {
-      id: 2,
-      name: "Abstract Reality",
-      price: "1.8",
-      type: "Physical",
-      tokenId: "1002",
-      supply: "12/50",
-      image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&h=500&fit=crop",
-      description: "Physical art pieces that blend traditional and digital mediums, creating unique hybrid artworks with authenticity certificates.",
-      isListed: true
-    },
-    {
-      id: 3,
-      name: "Digital Essence",
-      price: "3.2",
-      type: "Virtual",
-      tokenId: "1003",
-      supply: "78/200",
-      image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=500&h=500&fit=crop",
-      description: "Explore the essence of digital art with this groundbreaking collection that pushes the boundaries of creative expression.",
-      isListed: false
-    },
-    {
-      id: 4,
-      name: "Neon Genesis Limited Edition",
-      price: "4.1",
-      type: "Virtual",
-      tokenId: "1004",
-      supply: "23/75",
-      image: "https://images.unsplash.com/photo-1635322966219-b75ed372eb01?w=500&h=500&fit=crop",
-      description: "Vibrant neon-inspired digital artwork featuring futuristic cityscapes and retro-futuristic aesthetics in high resolution.",
-      isListed: false
-    },
-    {
-      id: 5,
-      name: "Ethereal Sculpture",
-      price: "5.5",
-      type: "Physical",
-      tokenId: "1005",
-      supply: "5/25",
-      image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=500&h=500&fit=crop",
-      description: "Limited edition physical sculptures with blockchain verification, each piece is handcrafted and comes with a certificate of authenticity.",
-      isListed: true
-    },
-    {
-      id: 6,
-      name: "Pixel Paradise",
-      price: "2.9",
-      type: "Virtual",
-      tokenId: "1006",
-      supply: "156/300",
-      image: "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=500&h=500&fit=crop",
-      description: "Retro pixel art meets modern design in this nostalgic collection that celebrates the golden age of gaming and digital culture.",
-      isListed: true
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS as `0x${string}`;
+
+  useEffect(() => {
+    if (!address) return;
+    loadMerchantNFTs();
+  }, [address]);
+
+  const loadMerchantNFTs = async () => {
+    if (!address) return;
+    setLoading(true);
+
+    try {
+      // 1. Get merchant's token IDs
+      const tokenIds = (await readContract(config, {
+        address: MULTI_PRODUCT_ADDRESS,
+        abi: MULTI_PRODUCT_ABI,
+        functionName: "getMerchantProducts",
+        args: [address],
+      })) as bigint[];
+
+      if (!tokenIds || tokenIds.length === 0) {
+        setNfts([]);
+        setLoading(false);
+        return;
+      }
+
+      // 2. For each tokenId, fetch URI and metadata
+      const nftData = await Promise.all(
+        tokenIds.map(async (tid, idx) => {
+          try {
+            // Get token URI
+            const uri = (await readContract(config, {
+              address: MULTI_PRODUCT_ADDRESS,
+              abi: MULTI_PRODUCT_ABI,
+              functionName: "uri",
+              args: [tid],
+            })) as string;
+
+            // Check if product is listed
+            const isListed = (await readContract(config, {
+              address: MULTI_PRODUCT_ADDRESS,
+              abi: MULTI_PRODUCT_ABI,
+              functionName: "isProductListed",
+              args: [tid],
+            })) as boolean;
+
+            // Get balance (supply)
+            const balance = (await readContract(config, {
+              address: MULTI_PRODUCT_ADDRESS,
+              abi: MULTI_PRODUCT_ABI,
+              functionName: "balanceOf",
+              args: [address, tid],
+            })) as bigint;
+
+            // Normalize IPFS URI
+            let metadataUrl = uri;
+            if (uri.startsWith("ipfs://")) {
+              metadataUrl = uri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+            } else if (!uri.startsWith("http")) {
+              metadataUrl = `https://gateway.pinata.cloud/ipfs/${uri}`;
+            }
+
+            // Fetch JSON metadata
+            const response = await fetch(metadataUrl);
+            if (!response.ok) throw new Error("Failed to fetch metadata");
+            const metadata: NFTMetadata = await response.json();
+
+            // Normalize image URL
+            let imageUrl = metadata.image || "";
+            if (imageUrl.startsWith("ipfs://")) {
+              imageUrl = imageUrl.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+            }
+
+            // Extract data from attributes
+            const priceAttr = metadata.attributes?.find((a) => a.trait_type === "Price (ETH)");
+            const typeAttr = metadata.attributes?.find((a) => a.trait_type === "Type");
+
+            return {
+              id: idx + 1,
+              tokenId: tid.toString(),
+              name: metadata.name || `Token #${tid}`,
+              description: metadata.description || "No description available",
+              image: imageUrl,
+              price: priceAttr?.value?.toString() || "0",
+              supply: balance.toString(),
+              type: typeAttr?.value?.toString() || "virtual",
+              isListed,
+            };
+          } catch (err) {
+            console.error(`Failed to load metadata for token ${tid}:`, err);
+            return null;
+          }
+        })
+      );
+
+      setNfts(nftData.filter((n) => n !== null) as MerchantNFT[]);
+    } catch (error) {
+      console.error("Failed to load merchant NFTs:", error);
+    } finally {
+      setLoading(false);
     }
-  ]
+  };
 
   const handleBurn = (id: number) => {
     console.log('Burning NFT:', id)
     alert(`Burn confirmation for NFT #${id}`)
   }
 
-  const handleList = (id: number) => {
-    console.log('Listing NFT:', id)
-    alert(`NFT #${id} listed successfully`)
+  const handleList = async (id: number) => {
+    const nft = nfts.find(n => n.id === id);
+    if (!nft) return;
+    
+    try {
+      // 1. Write the transaction - listProduct(tokenId)
+      const txHash = await writeContract(config, {
+        address: MULTI_PRODUCT_ADDRESS,
+        abi: MULTI_PRODUCT_ABI,
+        functionName: "listProduct",
+        args: [BigInt(nft.tokenId)],
+      });
+      
+      // 2. Wait for transaction confirmation
+      const receipt = await waitForTransactionReceipt(config, {
+        hash: txHash,
+      });
+      
+      // 3. Check transaction status
+      if (receipt.status === 'success') {
+        alert(`NFT #${id} listed successfully!`);
+        // Refresh the NFT list to update isListed status
+        await loadMerchantNFTs();
+      } else {
+        alert('Transaction failed');
+      }
+    } catch (error) {
+      console.error('Failed to list NFT:', error);
+      alert('Failed to list NFT. Check console for details.');
+    }
   }
 
-  const handleUnlist = (id: number) => {
-    console.log('Unlisting NFT:', id)
-    alert(`NFT #${id} removed from listing`)
+  const handleUnlist = async (id: number) => {
+    const nft = nfts.find(n => n.id === id);
+    if (!nft) return;
+    
+    try {
+      const txHash = await writeContract(config, {
+        address: MULTI_PRODUCT_ADDRESS,
+        abi: MULTI_PRODUCT_ABI,
+        functionName: "cancelProductListing",
+        args: [BigInt(nft.tokenId)],
+      });
+      
+      const receipt = await waitForTransactionReceipt(config, {
+        hash: txHash,
+      });
+      
+      if (receipt.status === 'success') {
+        alert(`NFT #${id} removed from listing!`);
+        await loadMerchantNFTs();
+      } else {
+        alert('Transaction failed');
+      }
+    } catch (error) {
+      console.error('Failed to unlist NFT:', error);
+      alert('Failed to unlist NFT. Check console for details.');
+    }
   }
 
   const handleMintVirtual = () => {
@@ -319,6 +417,16 @@ export default function MerchantDashboard() {
     total: nfts.length,
     listed: nfts.filter(n => n.isListed).length,
     unlisted: nfts.filter(n => !n.isListed).length,
+  }
+
+  if (!address) {
+    return (
+      <DefaultLayout>
+        <div className="min-h-screen flex items-center justify-center bg-[#030303]">
+          <p className="text-white/60">Please connect your wallet</p>
+        </div>
+      </DefaultLayout>
+    );
   }
 
   return (
@@ -433,32 +541,37 @@ export default function MerchantDashboard() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredNfts.length === 0 ? (
-              <div className="col-span-full text-center py-12 text-white/40">
-                No NFTs found in this category
-              </div>
-            ) : (
-              filteredNfts.map((nft, index) => (
-                <MerchantNFTCard
-                  key={nft.id}
-                  nft={nft}
-                  index={index}
-                  onBurn={handleBurn}
-                  onList={handleList}
-                  onUnlist={handleUnlist}
-                />
-              ))
-            )}
-          </div>
+          {loading ? (
+            <div className="col-span-full text-center py-12 text-white/40">
+              Loading products...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredNfts.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-white/40">
+                  No NFTs found in this category
+                </div>
+              ) : (
+                filteredNfts.map((nft, index) => (
+                  <MerchantNFTCard
+                    key={nft.id}
+                    nft={nft}
+                    index={index}
+                    onBurn={handleBurn}
+                    onList={handleList}
+                    onUnlist={handleUnlist}
+                  />
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mint Modal Dialog */}
+      {/* Mint Modal */}
       <AnimatePresence>
         {showMintModal && (
           <>
-            {/* Blurred Background */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -468,7 +581,6 @@ export default function MerchantDashboard() {
               className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
             />
 
-            {/* Modal Card */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -477,7 +589,6 @@ export default function MerchantDashboard() {
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
               <div className="w-full max-w-2xl bg-[#0a0a0a] border border-white/[0.12] rounded-3xl p-8 shadow-2xl">
-                {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                   <div>
                     <h2 className="text-3xl font-bold text-white mb-2">
@@ -495,30 +606,21 @@ export default function MerchantDashboard() {
                   </motion.button>
                 </div>
 
-                {/* Options Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Virtual Product Card */}
                   <motion.button
                     whileHover={{ scale: 1.02, y: -5 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleMintVirtual}
-                    className="group relative overflow-hidden rounded-2xl border-2 border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 to-transparent p-8 text-left transition-all hover:border-indigo-500/60 hover:bg-gradient-to-br hover:from-indigo-500/10 hover:to-transparent"
+                    className="group relative overflow-hidden rounded-2xl border-2 border-indigo-500/30 bg-gradient-to-br from-indigo-500/5 to-transparent p-8 text-left transition-all hover:border-indigo-500/60"
                   >
-                    {/* Background Gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/0 via-transparent to-indigo-600/0 group-hover:from-indigo-600/5 transition-all" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/0 to-indigo-600/0 group-hover:from-indigo-600/5 transition-all" />
                     
-                    {/* Content */}
                     <div className="relative z-10 space-y-4">
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-2">
-                          Virtual Product
-                        </h3>
-                        <p className="text-white/60 text-sm leading-relaxed">
-                          Create digital assets like art, music, 3D models, domain names, and virtual real estate
-                        </p>
+                        <h3 className="text-2xl font-bold text-white mb-2">Virtual Product</h3>
+                        <p className="text-white/60 text-sm">Digital assets like art, music, and virtual items</p>
                       </div>
 
-                      {/* Features List */}
                       <div className="space-y-2 pt-4">
                         <div className="flex items-center gap-2 text-indigo-300 text-sm">
                           <Sparkles className="w-4 h-4" />
@@ -526,17 +628,12 @@ export default function MerchantDashboard() {
                         </div>
                         <div className="flex items-center gap-2 text-indigo-300 text-sm">
                           <Zap className="w-4 h-4" />
-                          <span>Multiple file formats</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-indigo-300 text-sm">
-                          <Package className="w-4 h-4" />
-                          <span>Unlockable content</span>
+                          <span>Multiple formats</span>
                         </div>
                       </div>
 
-                      {/* CTA Button */}
                       <div className="pt-4">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-medium group-hover:bg-indigo-500/30 transition-all">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-500/20 border border-indigo-500/50 text-indigo-300 font-medium">
                           <Sparkles className="w-4 h-4" />
                           Mint Virtual
                         </div>
@@ -544,36 +641,24 @@ export default function MerchantDashboard() {
                     </div>
                   </motion.button>
 
-                  {/* Physical Product Card */}
                   <motion.button
                     whileHover={{ scale: 1.02, y: -5 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleMintPhysical}
-                    className="group relative overflow-hidden rounded-2xl border-2 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-transparent p-8 text-left transition-all hover:border-rose-500/60 hover:bg-gradient-to-br hover:from-rose-500/10 hover:to-transparent"
+                    className="group relative overflow-hidden rounded-2xl border-2 border-rose-500/30 bg-gradient-to-br from-rose-500/5 to-transparent p-8 text-left transition-all hover:border-rose-500/60"
                   >
-                    {/* Background Gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-rose-600/0 via-transparent to-rose-600/0 group-hover:from-rose-600/5 transition-all" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-rose-600/0 to-rose-600/0 group-hover:from-rose-600/5 transition-all" />
                     
-                    {/* Content */}
                     <div className="relative z-10 space-y-4">
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-2">
-                          Physical Product
-                        </h3>
-                        <p className="text-white/60 text-sm leading-relaxed">
-                          Create NFTs for physical items with authenticity certificates and provenance tracking
-                        </p>
+                        <h3 className="text-2xl font-bold text-white mb-2">Physical Product</h3>
+                        <p className="text-white/60 text-sm">Physical items with authenticity certificates</p>
                       </div>
 
-                      {/* Features List */}
                       <div className="space-y-2 pt-4">
                         <div className="flex items-center gap-2 text-rose-300 text-sm">
                           <Package className="w-4 h-4" />
                           <span>Authenticity verified</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-rose-300 text-sm">
-                          <Zap className="w-4 h-4" />
-                          <span>Physical delivery</span>
                         </div>
                         <div className="flex items-center gap-2 text-rose-300 text-sm">
                           <CheckCircle className="w-4 h-4" />
@@ -581,22 +666,14 @@ export default function MerchantDashboard() {
                         </div>
                       </div>
 
-                      {/* CTA Button */}
                       <div className="pt-4">
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-medium group-hover:bg-rose-500/30 transition-all">
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-medium">
                           <Package className="w-4 h-4" />
                           Mint Physical
                         </div>
                       </div>
                     </div>
                   </motion.button>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-8 pt-6 border-t border-white/[0.08]">
-                  <p className="text-center text-white/40 text-sm">
-                    Not sure? You can mint both types of products and manage them from your dashboard
-                  </p>
                 </div>
               </div>
             </motion.div>

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion"
 import { useState, type SelectHTMLAttributes, type ComponentType, type TextareaHTMLAttributes, type InputHTMLAttributes, type ChangeEvent, type FormEvent } from "react"
-import { Upload, X, DollarSign, Layers, FileText, Tag, Sparkles, Image as ImageIcon, File } from "lucide-react"
+import { Upload, X, DollarSign, Layers, FileText, Tag, Sparkles, Image as ImageIcon, File as FileIcon } from "lucide-react"
 import DefaultLayout from "@/layouts/default";
 import axios from "axios";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
@@ -162,47 +162,57 @@ export default function VirtualProductMint() {
   })
 
   const uploadImageToIPFS = async (): Promise<{ cid: string; url: string } | null> => {
-      if (!imagePreview) return null;
-  
-      try {
-        // Convert data URL (base64) to Blob if needed
-                let blob: Blob | null = null;
-                if (imagePreview.startsWith("data:")) {
-                  const [header, data] = imagePreview.split(",");
-                  const mime = header.match(/data:(.*);base64/)?.[1] || "image/png";
-                  const binary = atob(data);
-                  const array = new Uint8Array(binary.length);
-                  for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-                  blob = new Blob([array], { type: mime });
-                } else {
-                  // If it's already a URL, cannot pin without original file
-                  console.warn("No raw file available to pin.");
-                  return null;
-                }
-          
-                const formData = new FormData();
-                // append a blob with a filename so Pinata receives a proper file entry
-                formData.append("file", blob, "image.png"); // Pinata expects a file field
-  
-        const response = await axios.post(
-          "https://api.pinata.cloud/pinning/pinFileToIPFS",
-          formData,
-          {
-            maxBodyLength: Infinity,
-            headers: {
-              Authorization: `Bearer ${pinataJWT}`,
-            },
-          }
-        );
-  
-        const cid: string = response.data.IpfsHash;
-        console.log(cid);
-        return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
-      } catch (err) {
-        console.error("IPFS upload failed:", err);
-        return null;
+    if (!imagePreview) return null;
+
+    try {
+      // build File from data URL or fetch the image if it's a URL
+      let file: File;
+      if (imagePreview.startsWith("data:")) {
+        const [header, data] = imagePreview.split(",");
+        const mime = header.match(/data:(.*);base64/)?.[1] || "image/png";
+        const ext = mime.split("/")[1]?.split(";")[0] ?? "png";
+        const binary = atob(data);
+        const array = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+        file = new File([array], `image.${ext}`, { type: mime });
+      } else {
+        // imagePreview is a URL — fetch and convert to File/Blob
+        const resp = await fetch(imagePreview);
+        if (!resp.ok) throw new Error("Failed to fetch image URL");
+        const blob = await resp.blob();
+        const mime = blob.type || "image/png";
+        const ext = mime.split("/")[1]?.split(";")[0] ?? "png";
+        file = new File([blob], `image.${ext}`, { type: mime });
       }
+
+      const form = new FormData();
+      form.append("file", file); // pinFileToIPFS expects "file"
+      form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
+      form.append(
+        "pinataMetadata",
+        JSON.stringify({ name: `verimint_image_${Date.now()}` })
+      );
+
+      const response = await axios.post(
+        "https://api.pinata.cloud/pinning/pinFileToIPFS",
+        form,
+        {
+          maxBodyLength: Infinity,
+          headers: {
+            Authorization: `Bearer ${pinataJWT}`,
+            // DO NOT set Content-Type — browser/axios will set multipart boundary
+          },
+        }
+      );
+
+      const cid: string = response.data?.IpfsHash;
+      if (!cid) throw new Error("No IpfsHash returned from Pinata");
+      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+    } catch (err: any) {
+      console.error("IPFS upload failed:", err?.response?.data ?? err);
+      return null;
     }
+  }
   
   
     // Upload NFT metadata JSON to IPFS via Pinata
@@ -417,7 +427,7 @@ export default function VirtualProductMint() {
             {/* Digital File Upload */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-white/70">
-                <File className="w-4 h-4" />
+                <FileIcon className="w-4 h-4" />
                 Digital Asset File
                 <span className="text-white/40 text-xs font-normal ml-2">(Optional)</span>
               </label>
@@ -427,7 +437,7 @@ export default function VirtualProductMint() {
                   <div className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/[0.08] rounded-xl group hover:border-white/[0.12] transition-all">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-indigo-500/20 rounded-lg">
-                        <File className="w-5 h-5 text-indigo-300" />
+                        <FileIcon className="w-5 h-5 text-indigo-300" />
                       </div>
                       <div>
                         <p className="text-sm text-white/80 font-medium">{fileInfo.name}</p>

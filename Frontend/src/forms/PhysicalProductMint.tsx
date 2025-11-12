@@ -168,45 +168,56 @@ export default function PhysicalProductMint() {
     supply: '',
   })
 
-  // FIXED uploadToIPFS
+  // FIXED uploadToIPFS (handles dataURL or URL, adds pinataOptions/metadata)
   const uploadImageToIPFS = async (): Promise<{ cid: string; url: string } | null> => {
     if (!imagePreview) return null;
 
     try {
-      // Convert data URL (base64) to File if needed
+      // build File from data URL or fetch the image if it's a URL
       let file: File;
       if (imagePreview.startsWith("data:")) {
         const [header, data] = imagePreview.split(",");
         const mime = header.match(/data:(.*);base64/)?.[1] || "image/png";
+        const ext = mime.split("/")[1]?.split(";")[0] ?? "png";
         const binary = atob(data);
         const array = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-        file = new File([array], "image.png", { type: mime });
+        file = new File([array], `image.${ext}`, { type: mime });
       } else {
-        // If it's already a URL, cannot pin without original file
-        console.warn("No raw file available to pin.");
-        return null;
+        // imagePreview is a URL — fetch and convert to File/Blob
+        const resp = await fetch(imagePreview);
+        if (!resp.ok) throw new Error("Failed to fetch image URL");
+        const blob = await resp.blob();
+        const mime = blob.type || "image/png";
+        const ext = mime.split("/")[1]?.split(";")[0] ?? "png";
+        file = new File([blob], `image.${ext}`, { type: mime });
       }
 
-      const formData = new FormData();
-      formData.append("file", file); // Pinata expects a file field
+      const form = new FormData();
+      form.append("file", file); // pinFileToIPFS expects "file"
+      form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
+      form.append(
+        "pinataMetadata",
+        JSON.stringify({ name: `verimint_image_${Date.now()}` })
+      );
 
       const response = await axios.post(
         "https://api.pinata.cloud/pinning/pinFileToIPFS",
-        formData,
+        form,
         {
           maxBodyLength: Infinity,
           headers: {
             Authorization: `Bearer ${pinataJWT}`,
+            // DO NOT set Content-Type — browser/axios will set multipart boundary
           },
         }
       );
 
-      const cid: string = response.data.IpfsHash;
-      console.log(cid);
+      const cid: string = response.data?.IpfsHash;
+      if (!cid) throw new Error("No IpfsHash returned from Pinata");
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
-    } catch (err) {
-      console.error("IPFS upload failed:", err);
+    } catch (err: any) {
+      console.error("IPFS upload failed:", err?.response?.data ?? err);
       return null;
     }
   }
