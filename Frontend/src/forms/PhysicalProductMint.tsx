@@ -7,6 +7,7 @@ import { config } from "@/config/config";
 import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
 import { parseEther } from "viem";
 import DefaultLayout from "@/layouts/default";
+import { useAccount } from "wagmi";
 
 type ElegantShapeProps = {
   className?: string;
@@ -17,6 +18,7 @@ type ElegantShapeProps = {
   gradient?: string;
 }
 
+const { address } = useAccount();
 
 function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }: ElegantShapeProps) {
   return (
@@ -242,6 +244,7 @@ export default function PhysicalProductMint() {
           { trait_type: 'Warranty', value: formData.warranty },
           { trait_type: 'Price (ETH)', value: formData.price },
           { trait_type: 'Total Supply', value: formData.supply },
+          { trait_type: 'Merchant', value: address || 'Unknown' },
         ].filter(a => a.value && String(a.value).length > 0),
       }
 

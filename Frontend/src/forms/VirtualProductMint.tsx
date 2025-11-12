@@ -6,7 +6,8 @@ import axios from "axios";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
-import { parseEther } from "viem"; 
+import { parseEther } from "viem";
+import { useAccount } from "wagmi"; // ✅ Add this import
 
 type ElegantShapeProps = {
   className?: string;
@@ -143,6 +144,7 @@ interface FormDataType {
 }
 
 export default function VirtualProductMint() {
+  const { address } = useAccount(); // ✅ Get connected wallet address
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
   const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
@@ -218,10 +220,14 @@ export default function VirtualProductMint() {
     // Upload NFT metadata JSON to IPFS via Pinata
     const uploadJsonToIPFS = async (imageCid: string): Promise<{ cid: string; url: string } | null> => {
       try {
+        console.log("📦 Creating metadata JSON");
+        console.log("Connected Address:", address);
+        
         const metadata = {
           name: formData.name || 'Product',
           description: formData.description || '',
           image: `ipfs://${imageCid}`,
+          external_url: formData.externalLink || '',
           attributes: [
             { trait_type: 'Type', value: 'virtual' },
             { trait_type: 'Category', value: formData.category },
@@ -231,33 +237,37 @@ export default function VirtualProductMint() {
             { trait_type: 'Unlock Content', value: formData.unlockableContent },
             { trait_type: 'Price (ETH)', value: formData.price },
             { trait_type: 'Total Supply', value: formData.supply },
+            { trait_type: 'Merchant', value: address || 'Unknown' }, // ✅ Add merchant address
           ].filter(a => a.value && String(a.value).length > 0),
         }
-  
-        const body = {
-          pinataOptions: { cidVersion: 1 },
-          pinataMetadata: { name: `verimint_${metadata.name}_${Date.now()}` },
-          pinataContent: metadata,
-        }
-  
-        const res = await axios.post(
-          'https://api.pinata.cloud/pinning/pinJSONToIPFS',
-          body,
-          {
-            headers: {
-              Authorization: `Bearer ${pinataJWT}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-  
-        const cid: string = res.data.IpfsHash
-        return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
-      } catch (e) {
-        console.error('JSON upload failed:', e)
-        return null
+
+      console.log("📝 Metadata to upload:", JSON.stringify(metadata, null, 2));
+
+      const body = {
+        pinataOptions: { cidVersion: 1 },
+        pinataMetadata: { name: `verimint_${metadata.name}_${Date.now()}` },
+        pinataContent: metadata,
       }
+
+      const res = await axios.post(
+        'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+        body,
+        {
+          headers: {
+            Authorization: `Bearer ${pinataJWT}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+
+      const cid: string = res.data.IpfsHash
+      console.log("✅ Metadata uploaded to IPFS:", cid);
+      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
+    } catch (e) {
+      console.error('❌ JSON upload failed:', e)
+      return null
     }
+  }
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -291,12 +301,40 @@ export default function VirtualProductMint() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    
+    console.log("🚀 Starting mint process");
+    console.log("Connected Address:", address);
+    
+    if (!address) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    console.log("1️⃣ Uploading image to IPFS...");
     const img = await uploadImageToIPFS()
-    if (!img) return alert('Image upload failed')
+    if (!img) {
+      alert('Image upload failed')
+      return;
+    }
+    console.log("✅ Image uploaded:", img.cid);
+
+    console.log("2️⃣ Uploading metadata to IPFS...");
     const meta = await uploadJsonToIPFS(img.cid)
-    if (!meta) return alert('Metadata upload failed')
-    console.log('Metadata CID:', meta.cid, 'URL:', meta.url)
-    // alert('Metadata uploaded to IPFS!')
+    if (!meta) {
+      alert('Metadata upload failed')
+      return;
+    }
+    console.log("✅ Metadata uploaded:", meta.cid);
+
+    console.log("3️⃣ Minting NFT on blockchain...");
+    console.log("Args:", {
+      supply: formData.supply,
+      price: parseEther(formData.price),
+      name: formData.name,
+      description: formData.description,
+      type: "virtual",
+      uri: meta.cid
+    });
 
     const txHash = await writeContract(config, {
       address: MULTI_PRODUCT_ADDRESS,
@@ -312,13 +350,16 @@ export default function VirtualProductMint() {
       ]
     });
 
+    console.log("⏳ Waiting for transaction confirmation...", txHash);
     const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+    
     if (receipt.status === "success") {
-      console.log("Success")
+      console.log("✅ NFT minted successfully!");
+      alert('Virtual Product NFT minted successfully!');
     } else {
-      console.log("Error");
+      console.log("❌ Transaction failed");
+      alert('Transaction failed');
     }
-
   }
 
 

@@ -99,6 +99,8 @@ export default function ProductDetails() {
 
   // Log component mount
   useEffect(() => {
+    window.scroll(0, 0);
+
     console.log("🚀 ProductDetails component mounted");
     console.log("📍 URL Parameter 'id':", id);
     console.log("🏭 Contract Address:", MULTI_PRODUCT_ADDRESS);
@@ -546,7 +548,7 @@ export default function ProductDetails() {
                         <DetailRow icon={Package} label="Token Standard" value="ERC-1155" highlight={false} />
                         <DetailRow icon={Tag} label="Blockchain" value="Ethereum" highlight={false} />
                         <DetailRow icon={Layers} label="Supply" value={nft.supply} highlight={false} />
-                        <DetailRow icon={TrendingUp} label="Type" value={nft.type} highlight={true} />
+                        <DetailRow icon={TrendingUp} label="Type" value={nft.type.toUpperCase()} highlight={true} />
                       </div>
                     </div>
                   </div>
@@ -558,8 +560,8 @@ export default function ProductDetails() {
                     <div className="grid grid-cols-2 gap-3">
                       {metadata.attributes.map((attr, i) => (
                         <div key={i} className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-4">
-                          <div className="text-xs text-white/40 mb-1">{attr.trait_type}</div>
-                          <div className="text-sm font-semibold text-white/90">{attr.value}</div>
+                          <div className="text-xs text-white/40 mb-1 uppercase">{attr.trait_type}</div>
+                          <div className="text-sm font-semibold text-white/90 uppercase">{attr.value}</div>
                         </div>
                       ))}
                     </div>
@@ -568,16 +570,7 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Contract Link */}
-            <a
-              href={`https://etherscan.io/address/${nft.contractAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-sm text-white/60 hover:text-white/90 hover:border-white/[0.15] transition-all"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View on Etherscan
-            </a>
+            
           </motion.div>
         </div>
       </div>
