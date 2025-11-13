@@ -1,5 +1,5 @@
 import { motion } from "framer-motion"
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Upload, X, Calendar, Package, Hash, DollarSign, Layers, FileText, CheckCircle, Tag } from "lucide-react"
 import axios from "axios";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
@@ -9,6 +9,7 @@ import { parseEther } from "viem";
 import DefaultLayout from "@/layouts/default";
 import { useAccount } from "wagmi";
 
+
 type ElegantShapeProps = {
   className?: string;
   delay?: number;
@@ -17,8 +18,6 @@ type ElegantShapeProps = {
   rotate?: number;
   gradient?: string;
 }
-
-const { address } = useAccount();
 
 function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }: ElegantShapeProps) {
   return (
@@ -150,6 +149,7 @@ interface FormDataType {
 }
 
 export default function PhysicalProductMint() {
+  const { address } = useAccount();
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
@@ -169,6 +169,10 @@ export default function PhysicalProductMint() {
     price: '',
     supply: '',
   })
+
+  useEffect(() => {
+    console.log("Connected wallet address:", address);
+  }, [address])
 
   // FIXED uploadToIPFS (handles dataURL or URL, adds pinataOptions/metadata)
   const uploadImageToIPFS = async (): Promise<{ cid: string; url: string } | null> => {

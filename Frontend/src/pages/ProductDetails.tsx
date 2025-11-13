@@ -246,12 +246,14 @@ export default function ProductDetails() {
       const typeAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Type");
       const categoryAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Category");
       const supplyAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Total Supply");
+      const merchantAttr = fetchedMetadata.attributes?.find((a) => a.trait_type === "Merchant"); // ✅ Extract merchant from metadata
       
       console.log("📊 Extracted Attributes:");
       console.log("  - Price (ETH):", priceAttr);
       console.log("  - Type:", typeAttr);
       console.log("  - Category:", categoryAttr);
       console.log("  - Total Supply:", supplyAttr);
+      console.log("  - Merchant:", merchantAttr);
 
       const nftData = {
         tokenId,
@@ -261,8 +263,8 @@ export default function ProductDetails() {
         price: priceAttr?.value?.toString() || product.price?.toString() || "0",
         supply: supplyAttr?.value?.toString() || "0",
         type: typeAttr?.value?.toString() || product.productType || "virtual",
-        category: isListed ? "Listed" : "Unlisted", // ✅ Changed from categoryAttr
-        merchant: product.merchant || "Unknown",
+        category: isListed ? "Listed" : "Unlisted",
+        merchant: merchantAttr?.value?.toString() || product.merchant || "Unknown", // ✅ Use merchant from metadata first, then contract
         contractAddress: MULTI_PRODUCT_ADDRESS,
         isListed,
       };
@@ -498,7 +500,7 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Merchant */}
+            {/* Merchant - UPDATED */}
             <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4">
               <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
                 <User className="w-3 h-3" />
@@ -508,7 +510,12 @@ export default function ProductDetails() {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-400 to-rose-400" />
                 <div>
                   <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium text-white/90 font-mono">{nft.merchant.slice(0, 10)}...</span>
+                    <span className="text-sm font-medium text-white/90 font-mono">
+                      {nft.merchant.length > 20 
+                        ? `${nft.merchant.slice(0, 10)}...${nft.merchant.slice(-8)}`
+                        : nft.merchant
+                      }
+                    </span>
                   </div>
                   <span className="text-xs text-white/40">Product Creator</span>
                 </div>
@@ -558,19 +565,20 @@ export default function ProductDetails() {
                   <div>
                     <h3 className="text-base font-semibold text-white/90 mb-4">Properties & Attributes</h3>
                     <div className="grid grid-cols-2 gap-3">
-                      {metadata.attributes.map((attr, i) => (
-                        <div key={i} className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-4">
-                          <div className="text-xs text-white/40 mb-1 uppercase">{attr.trait_type}</div>
-                          <div className="text-sm font-semibold text-white/90 uppercase">{attr.value}</div>
-                        </div>
-                      ))}
+                      {metadata.attributes
+                        .filter(attr => attr.trait_type !== "Merchant") // ✅ Filter out Merchant from properties
+                        .map((attr, i) => (
+                          <div key={i} className="bg-white/[0.02] border border-white/[0.08] rounded-xl p-4">
+                            <div className="text-xs text-white/40 mb-1 uppercase">{attr.trait_type}</div>
+                            <div className="text-sm font-semibold text-white/90 uppercase">{attr.value}</div>
+                          </div>
+                        ))
+                      }
                     </div>
                   </div>
                 )}
               </div>
             </div>
-
-            
           </motion.div>
         </div>
       </div>
