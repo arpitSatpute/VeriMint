@@ -3,7 +3,12 @@
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_multiProduct",
+				"name": "_orderManager",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_productNFT",
 				"type": "address"
 			}
 		],
@@ -61,7 +66,7 @@
 			},
 			{
 				"indexed": false,
-				"internalType": "enum EscrowMultiProduct.DeliveryStatus",
+				"internalType": "enum IOrderManager.DeliveryStatus",
 				"name": "status",
 				"type": "uint8"
 			}
@@ -260,17 +265,7 @@
 				"type": "uint256"
 			},
 			{
-				"internalType": "string",
-				"name": "productType",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "deliveryPointHash",
-				"type": "string"
-			},
-			{
-				"internalType": "enum EscrowMultiProduct.DeliveryStatus",
+				"internalType": "enum IOrderManager.DeliveryStatus",
 				"name": "deliveryStatus",
 				"type": "uint8"
 			},
@@ -319,9 +314,9 @@
 				"type": "uint256"
 			},
 			{
-				"internalType": "string",
+				"internalType": "bytes32",
 				"name": "deliveryPointHash",
-				"type": "string"
+				"type": "bytes32"
 			}
 		],
 		"name": "fundEscrow",
@@ -378,17 +373,7 @@
 						"type": "uint256"
 					},
 					{
-						"internalType": "string",
-						"name": "productType",
-						"type": "string"
-					},
-					{
-						"internalType": "string",
-						"name": "deliveryPointHash",
-						"type": "string"
-					},
-					{
-						"internalType": "enum EscrowMultiProduct.DeliveryStatus",
+						"internalType": "enum IOrderManager.DeliveryStatus",
 						"name": "deliveryStatus",
 						"type": "uint8"
 					},
@@ -494,10 +479,10 @@
 	},
 	{
 		"inputs": [],
-		"name": "multiProduct",
+		"name": "orderManager",
 		"outputs": [
 			{
-				"internalType": "contract IMultiProduct",
+				"internalType": "contract IOrderManager",
 				"name": "",
 				"type": "address"
 			}
@@ -511,6 +496,19 @@
 		"outputs": [
 			{
 				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "productNFT",
+		"outputs": [
+			{
+				"internalType": "contract IProductNFT",
 				"name": "",
 				"type": "address"
 			}
@@ -572,7 +570,7 @@
 				"type": "uint256"
 			},
 			{
-				"internalType": "enum EscrowMultiProduct.DeliveryStatus",
+				"internalType": "enum IOrderManager.DeliveryStatus",
 				"name": "status",
 				"type": "uint8"
 			}
