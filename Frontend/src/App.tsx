@@ -31,7 +31,7 @@ function App() {
             <Route element={<AboutPage />} path="/about" />
             <Route element={<PhysicalProductMint />} path="/physicalMint" />
             <Route element={<VirtualProductMint />} path="/virtualMint" />
-            <Route element={<CreateOrderForm />} path="/createOrder" />
+            <Route element={<CreateOrderForm />} path="/createOrder/:id" />
             <Route element={<ProductDetails />} path="/productDetails/:id" />
           </Routes>
         </QueryClientProvider>
