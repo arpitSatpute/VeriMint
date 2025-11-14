@@ -4,7 +4,7 @@ import { Upload, X, Calendar, Package, Hash, DollarSign, Layers, FileText, Check
 import axios from "axios";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
-import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { parseEther } from "viem";
 import DefaultLayout from "@/layouts/default";
 import { useAccount } from "wagmi";
@@ -153,7 +153,7 @@ export default function PhysicalProductMint() {
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
-  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
+  const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS;
 
   const [formData, setFormData] = useState<FormDataType>({
     identityNumber: '',
@@ -174,12 +174,12 @@ export default function PhysicalProductMint() {
     console.log("Connected wallet address:", address);
   }, [address])
 
-  // FIXED uploadToIPFS (handles dataURL or URL, adds pinataOptions/metadata)
+
+  // FIXED: uploadImageToIPFS
   const uploadImageToIPFS = async (): Promise<{ cid: string; url: string } | null> => {
     if (!imagePreview) return null;
 
     try {
-      // build File from data URL or fetch the image if it's a URL
       let file: File;
       if (imagePreview.startsWith("data:")) {
         const [header, data] = imagePreview.split(",");
@@ -190,9 +190,7 @@ export default function PhysicalProductMint() {
         for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
         file = new File([array], `image.${ext}`, { type: mime });
       } else {
-        // imagePreview is a URL — fetch and convert to File/Blob
         const resp = await fetch(imagePreview);
-        if (!resp.ok) throw new Error("Failed to fetch image URL");
         const blob = await resp.blob();
         const mime = blob.type || "image/png";
         const ext = mime.split("/")[1]?.split(";")[0] ?? "png";
@@ -200,12 +198,9 @@ export default function PhysicalProductMint() {
       }
 
       const form = new FormData();
-      form.append("file", file); // pinFileToIPFS expects "file"
+      form.append("file", file);
       form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
-      form.append(
-        "pinataMetadata",
-        JSON.stringify({ name: `verimint_image_${Date.now()}` })
-      );
+      form.append("pinataMetadata", JSON.stringify({ name: `verimint_image_${Date.now()}` }));
 
       const response = await axios.post(
         "https://api.pinata.cloud/pinning/pinFileToIPFS",
@@ -214,28 +209,29 @@ export default function PhysicalProductMint() {
           maxBodyLength: Infinity,
           headers: {
             Authorization: `Bearer ${pinataJWT}`,
-            // DO NOT set Content-Type — browser/axios will set multipart boundary
           },
         }
       );
 
       const cid: string = response.data?.IpfsHash;
-      if (!cid) throw new Error("No IpfsHash returned from Pinata");
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
-    } catch (err: any) {
-      console.error("IPFS upload failed:", err?.response?.data ?? err);
+    } catch (err) {
+      console.error("IPFS upload failed:", err);
       return null;
     }
-  }
+  };
 
 
-  // Upload NFT metadata JSON to IPFS via Pinata
-  const uploadJsonToIPFS = async (imageCid: string): Promise<{ cid: string; url: string } | null> => {
+  // FIX APPLIED HERE → store HTTPS gateway for image
+  const uploadJsonToIPFS = async (imageCid: string) => {
     try {
       const metadata = {
         name: formData.name || 'Product',
         description: formData.description || '',
-        image: `ipfs://${imageCid}`,
+
+        // FIX (IMPORTANT)
+        image: `https://gateway.pinata.cloud/ipfs/${imageCid}`,
+
         attributes: [
           { trait_type: 'Type', value: 'physical' },
           { trait_type: 'Identity Number', value: formData.identityNumber },
@@ -269,13 +265,14 @@ export default function PhysicalProductMint() {
         }
       )
 
-      const cid: string = res.data.IpfsHash
+      const cid = res.data.IpfsHash
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
     } catch (e) {
       console.error('JSON upload failed:', e)
       return null
     }
   }
+
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -288,6 +285,7 @@ export default function PhysicalProductMint() {
     }
   }
 
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -296,19 +294,20 @@ export default function PhysicalProductMint() {
     }))
   }
 
-  // Make submit upload image first, then JSON
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const img = await uploadImageToIPFS()
     if (!img) return alert('Image upload failed')
+
     const meta = await uploadJsonToIPFS(img.cid)
     if (!meta) return alert('Metadata upload failed')
+
     console.log('Metadata CID:', meta.cid, 'URL:', meta.url)
-    // alert('Metadata uploaded to IPFS!')
 
     const txHash = await writeContract(config, {
-      address: MULTI_PRODUCT_ADDRESS,
-      abi: MULTI_PRODUCT_ABI,
+      address: PRODUCT_NFT_ADDRESS,
+      abi: PRODUCT_NFT_ABI,
       functionName: "mintProductNft",
       args: [
         formData.supply,
@@ -326,8 +325,8 @@ export default function PhysicalProductMint() {
     } else {
       console.log("Error");
     }
-
   }
+
 
   const handleCancel = () => {
     if (confirm('Are you sure you want to cancel? All data will be lost.')) {
