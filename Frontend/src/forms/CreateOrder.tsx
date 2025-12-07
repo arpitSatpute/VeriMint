@@ -5,7 +5,7 @@ import DefaultLayout from "@/layouts/default";
 import { useParams } from "react-router-dom";
 import { readContract, writeContract, waitForTransactionReceipt } from "wagmi/actions";
 import { config } from "@/config/config";
-import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import escrowMultiProductAbi from "@/abis/escrowMultiProduct.json"; // ✅ Add import
 import { parseEther, formatEther } from "viem"; // ✅ Add formatEther
 
@@ -146,7 +146,7 @@ export default function CreateOrderForm() {
       // Get token URI
       const uri = (await readContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "uri",
         args: [BigInt(tokenId)],
       })) as string;
@@ -154,7 +154,7 @@ export default function CreateOrderForm() {
       // Get product details from contract
       const product = (await readContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "mintedProduct",
         args: [BigInt(tokenId)],
       })) as any;

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Search, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { readContract } from "wagmi/actions";
 import { config } from "@/config/config";
 
@@ -79,12 +79,12 @@ function NFTCard({ nft, index }: NFTCardProps) {
   }
 
   const handleCardClick = () => {
-    console.log("🖱️ NFT Card clicked, navigating to:", `/product/${nft.tokenId}`);
+    console.log("🖱️ NFT Card clicked, navigating to:", `/productDetails/${nft.tokenId}`);
     navigate(`/productDetails/${nft.tokenId}`);
   }
 
   const handleBuyNowClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click when clicking buy button
+    e.stopPropagation();
     console.log("💳 Buy Now clicked for token:", nft.tokenId);
     navigate(`/productDetails/${nft.tokenId}`);
   }
@@ -191,14 +191,31 @@ export default function NFTMarketplace() {
     setLoading(true);
 
     try {
-      // 1. Get all listed products
-      const [listings, tokenIds, products] = (await readContract(config, {
+      console.log("📡 Fetching getAllListedProducts from:", MULTI_PRODUCT_ADDRESS);
+      
+      // ✅ Properly typed response
+      const response = await readContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
-        functionName: "getAllListing",
-      })) as [any[], bigint[], any[]];
+        abi: PRODUCT_NFT_ABI,
+        functionName: "getAllListedProducts",
+      }) as { result: [bigint[], any[]] } | [bigint[], any[]];
+
+      // Handle both possible response formats
+      let tokenIds: bigint[] = [];
+      let products: any[] = [];
+
+      if (Array.isArray(response) && response.length === 2) {
+        [tokenIds, products] = response;
+      } else if (response && 'result' in response) {
+        [tokenIds, products] = response.result;
+      } else {
+        throw new Error("Invalid response format from getAllListedProducts");
+      }
+
+      console.log("✅ Got response - Token IDs:", tokenIds.length, "Products:", products.length);
 
       if (!tokenIds || tokenIds.length === 0) {
+        console.log("⚠️ No listed products found");
         setNfts([]);
         setLoading(false);
         return;
@@ -208,13 +225,15 @@ export default function NFTMarketplace() {
       const nftData = await Promise.all(
         tokenIds.map(async (tid, idx) => {
           try {
+            const product = products[idx];
+
+            if (!product) {
+              console.warn(`⚠️ No product data for token ${tid}`);
+              return null;
+            }
+
             // Get token URI
-            const uri = (await readContract(config, {
-              address: MULTI_PRODUCT_ADDRESS,
-              abi: MULTI_PRODUCT_ABI,
-              functionName: "uri",
-              args: [tid],
-            })) as string;
+            const uri = product.tokenURI || "";
 
             // Normalize IPFS URI
             let metadataUrl = uri;
@@ -225,9 +244,21 @@ export default function NFTMarketplace() {
             }
 
             // Fetch JSON metadata
-            const response = await fetch(metadataUrl);
-            if (!response.ok) throw new Error("Failed to fetch metadata");
-            const metadata: NFTMetadata = await response.json();
+            let metadata: NFTMetadata = {
+              name: product.name || `Token #${tid}`,
+              description: product.description || "No description available",
+              image: "",
+              attributes: []
+            };
+
+            try {
+              const response = await fetch(metadataUrl);
+              if (response.ok) {
+                metadata = await response.json();
+              }
+            } catch (err) {
+              console.warn(`⚠️ Failed to fetch metadata for token ${tid}:`, err);
+            }
 
             // Normalize image URL
             let imageUrl = metadata.image || "";
@@ -235,30 +266,39 @@ export default function NFTMarketplace() {
               imageUrl = imageUrl.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
             }
 
-            // Extract data from attributes
-            const priceAttr = metadata.attributes?.find((a) => a.trait_type === "Price (ETH)");
-            const typeAttr = metadata.attributes?.find((a) => a.trait_type === "Type");
+            // ✅ Get type from productType (bytes32)
+            const typeBytes = product.productType;
+            let typeString = "virtual";
+            
+            if (typeof typeBytes === "string") {
+              typeString = typeBytes === "0x7669727475616c0000000000000000000000000000000000000000000000000000" 
+                ? "virtual" 
+                : "physical";
+            }
 
             return {
               id: idx + 1,
               tokenId: tid.toString(),
-              name: metadata.name || `Token #${tid}`,
-              description: metadata.description || "No description available",
+              name: product.name || metadata.name || `Token #${tid}`,
+              description: product.description || metadata.description || "No description available",
               image: imageUrl,
-              price: priceAttr?.value?.toString() || listings[idx].price?.toString() || "0",
-              type: typeAttr?.value?.toString() || "virtual",
-              merchant: listings[idx].merchant,
+              price: (Number(product.price) / 1e18).toFixed(4),
+              type: typeString,
+              merchant: product.merchant || "Unknown",
             };
           } catch (err) {
-            console.error(`Failed to load metadata for token ${tid}:`, err);
+            console.error(`❌ Failed to process token ${tid}:`, err);
             return null;
           }
         })
       );
 
-      setNfts(nftData.filter((n) => n !== null) as ListedNFT[]);
+      const validNfts = nftData.filter((n) => n !== null) as ListedNFT[];
+      console.log("✅ Loaded NFTs:", validNfts);
+      setNfts(validNfts);
     } catch (error) {
-      console.error("Failed to load listed NFTs:", error);
+      console.error("❌ Failed to load listed NFTs:", error);
+      alert("Failed to load products. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -279,6 +319,7 @@ export default function NFTMarketplace() {
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
+      {/* Background shapes remain the same */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <ElegantShape
           delay={0.3}

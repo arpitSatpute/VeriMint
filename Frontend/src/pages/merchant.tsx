@@ -6,7 +6,7 @@ import DefaultLayout from "@/layouts/default"
 import { useAccount } from "wagmi";
 import { readContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
-import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 
 type ElegantShapeProps = {
   className?: string;
@@ -244,7 +244,7 @@ export default function MerchantDashboard() {
       // 1. Get merchant's token IDs
       const tokenIds = (await readContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "getMerchantProducts",
         args: [address],
       })) as bigint[];
@@ -262,7 +262,7 @@ export default function MerchantDashboard() {
             // Get token URI
             const uri = (await readContract(config, {
               address: MULTI_PRODUCT_ADDRESS,
-              abi: MULTI_PRODUCT_ABI,
+              abi: PRODUCT_NFT_ABI,
               functionName: "uri",
               args: [tid],
             })) as string;
@@ -270,7 +270,7 @@ export default function MerchantDashboard() {
             // Check if product is listed
             const isListed = (await readContract(config, {
               address: MULTI_PRODUCT_ADDRESS,
-              abi: MULTI_PRODUCT_ABI,
+              abi: PRODUCT_NFT_ABI,
               functionName: "isProductListed",
               args: [tid],
             })) as boolean;
@@ -278,7 +278,7 @@ export default function MerchantDashboard() {
             // Get balance (supply)
             const balance = (await readContract(config, {
               address: MULTI_PRODUCT_ADDRESS,
-              abi: MULTI_PRODUCT_ABI,
+              abi: PRODUCT_NFT_ABI,
               functionName: "balanceOf",
               args: [address, tid],
             })) as bigint;
@@ -345,7 +345,7 @@ export default function MerchantDashboard() {
       // 1. Write the transaction - listProduct(tokenId)
       const txHash = await writeContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "listProduct",
         args: [BigInt(nft.tokenId)],
       });
@@ -376,7 +376,7 @@ export default function MerchantDashboard() {
     try {
       const txHash = await writeContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "cancelProductListing",
         args: [BigInt(nft.tokenId)],
       });

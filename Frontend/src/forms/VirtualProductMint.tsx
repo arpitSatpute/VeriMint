@@ -5,7 +5,7 @@ import DefaultLayout from "@/layouts/default";
 import axios from "axios";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
-import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json";
+import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { parseEther } from "viem";
 import { useAccount } from "wagmi"; // ✅ Add this import
 
@@ -338,7 +338,7 @@ export default function VirtualProductMint() {
 
     const txHash = await writeContract(config, {
       address: MULTI_PRODUCT_ADDRESS,
-      abi: MULTI_PRODUCT_ABI,
+      abi: PRODUCT_NFT_ABI,
       functionName: "mintProductNft",
       args: [
         formData.supply,

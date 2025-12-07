@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom"
 import { ShoppingCart, Heart, Share2, ExternalLink, Clock, Package, Hash, Layers, Tag, Sparkles, Calendar, CheckCircle, TrendingUp, User, Eye } from "lucide-react"
 import { readContract } from "wagmi/actions"
 import { config } from "@/config/config"
-import MULTI_PRODUCT_ABI from "@/abis/multiProduct.json"
+import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 import DefaultLayout from "@/layouts/default"
 
 type ElegantShapeProps = {
@@ -142,7 +142,7 @@ export default function ProductDetails() {
       
       const uri = (await readContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "uri",
         args: [BigInt(tokenId)],
       })) as string;
@@ -157,7 +157,7 @@ export default function ProductDetails() {
       
       const isListed = (await readContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "isProductListed",
         args: [BigInt(tokenId)],
       })) as boolean;
@@ -171,7 +171,7 @@ export default function ProductDetails() {
       
       const product = (await readContract(config, {
         address: MULTI_PRODUCT_ADDRESS,
-        abi: MULTI_PRODUCT_ABI,
+        abi: PRODUCT_NFT_ABI,
         functionName: "mintedProduct",
         args: [BigInt(tokenId)],
       })) as any;
