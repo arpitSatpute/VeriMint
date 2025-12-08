@@ -1,10 +1,9 @@
 import { Route, Routes } from "react-router-dom";
 
-import IndexPage from "@/pages/index";
-import Merchant from "@/pages/Merchant";
-import Order from "@/pages/Order";
-import Product from "@/pages/Product";
-import AboutPage from "@/pages/about";
+import IndexPage from "./pages/index";
+import Order from "./pages/Order";
+import Product from "./pages/Product";
+import AboutPage from "./pages/about";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { config } from "@/config/config";
@@ -13,6 +12,7 @@ import PhysicalProductMint from "./forms/PhysicalProductMint";
 import VirtualProductMint from "./forms/VirtualProductMint";
 import CreateOrderForm from "./forms/CreateOrder";
 import ProductDetails from "./pages/ProductDetails";
+import Merchant from "./pages/Merchant";
 
 
 const queryClient = new QueryClient();
