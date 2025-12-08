@@ -6,7 +6,7 @@ import axios from "axios";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import PRODUCT_NFT_ABI from "@/abis/productNft.json";
-import { parseEther } from "viem";
+import { parseEther, keccak256, toBytes } from "viem";
 import { useAccount } from "wagmi"; // ✅ Add this import
 
 type ElegantShapeProps = {
@@ -147,7 +147,7 @@ export default function VirtualProductMint() {
   const { address } = useAccount(); // ✅ Get connected wallet address
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
-  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS;
+  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
  
   const [fileInfo, setFileInfo] = useState<FileInfoType | null>(null)
   const [formData, setFormData] = useState<FormDataType>({
@@ -327,6 +327,10 @@ export default function VirtualProductMint() {
     console.log("✅ Metadata uploaded:", meta.cid);
 
     console.log("3️⃣ Minting NFT on blockchain...");
+    
+    // Convert "virtual" to bytes32 using keccak256
+    const productTypeBytes32 = keccak256(toBytes("virtual"));
+    
     console.log("Args:", {
       supply: formData.supply,
       price: parseEther(formData.price),
@@ -339,13 +343,13 @@ export default function VirtualProductMint() {
     const txHash = await writeContract(config, {
       address: MULTI_PRODUCT_ADDRESS,
       abi: PRODUCT_NFT_ABI,
-      functionName: "mintProductNft",
+      functionName: "mintProduct",
       args: [
-        formData.supply,
+        BigInt(formData.supply),
         parseEther(formData.price),
         formData.name,
         formData.description,
-        "virtual",
+        productTypeBytes32,
         meta.cid
       ]
     });

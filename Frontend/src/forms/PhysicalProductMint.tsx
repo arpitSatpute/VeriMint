@@ -5,7 +5,7 @@ import axios from "axios";
 import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import PRODUCT_NFT_ABI from "@/abis/productNft.json";
-import { parseEther } from "viem";
+import { parseEther, keccak256, toBytes } from "viem";
 import DefaultLayout from "@/layouts/default";
 import { useAccount } from "wagmi";
 
@@ -305,25 +305,49 @@ export default function PhysicalProductMint() {
 
     console.log('Metadata CID:', meta.cid, 'URL:', meta.url)
 
-    const txHash = await writeContract(config, {
-      address: PRODUCT_NFT_ADDRESS,
-      abi: PRODUCT_NFT_ABI,
-      functionName: "mintProductNft",
-      args: [
-        formData.supply,
-        parseEther(formData.price),
-        formData.name,
-        formData.description,
-        "physical",
-        meta.cid
-      ]
-    });
+    try {
+      // Convert "physical" to bytes32 using keccak256
+      const productTypeBytes32 = keccak256(toBytes("physical"));
 
-    const receipt = await waitForTransactionReceipt(config, { hash: txHash });
-    if (receipt.status === "success") {
-      console.log("Success")
-    } else {
-      console.log("Error");
+      const txHash = await writeContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: PRODUCT_NFT_ABI,
+        functionName: "mintProduct",
+        args: [
+          BigInt(formData.supply),
+          parseEther(formData.price),
+          formData.name,
+          formData.description,
+          productTypeBytes32,
+          meta.cid
+        ]
+      });
+
+      const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+      if (receipt.status === "success") {
+        alert('Product minted successfully!');
+        // Reset form
+        setFormData({
+          identityNumber: '',
+          batchNumber: '',
+          manufacturingDate: '',
+          expiryDate: '',
+          weight: '',
+          dimensions: '',
+          shippingInfo: '',
+          warranty: '',
+          name: '',
+          description: '',
+          price: '',
+          supply: '',
+        });
+        setImagePreview(null);
+      } else {
+        alert('Transaction failed');
+      }
+    } catch (error) {
+      console.error('Minting error:', error);
+      alert('Failed to mint product. Please try again.');
     }
   }
 
