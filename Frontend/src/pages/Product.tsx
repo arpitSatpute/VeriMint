@@ -62,6 +62,7 @@ type ListedNFT = {
   image: string
   description: string
   merchant: string
+  attributes?: Array<{ trait_type: string; value: string | number }>
 }
 
 type NFTCardProps = {
@@ -80,13 +81,17 @@ function NFTCard({ nft, index }: NFTCardProps) {
 
   const handleCardClick = () => {
     console.log("🖱️ NFT Card clicked, navigating to:", `/productDetails/${nft.tokenId}`);
-    navigate(`/productDetails/${nft.tokenId}`);
+    navigate(`/productDetails/${nft.tokenId}`, { 
+      state: { productData: nft }
+    });
   }
 
   const handleBuyNowClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     console.log("💳 Buy Now clicked for token:", nft.tokenId);
-    navigate(`/productDetails/${nft.tokenId}`);
+    navigate(`/productDetails/${nft.tokenId}`, { 
+      state: { productData: nft }
+    });
   }
 
   return (
@@ -181,7 +186,7 @@ export default function NFTMarketplace() {
   const [searchQuery, setSearchQuery] = useState('')
   const [nfts, setNfts] = useState<ListedNFT[]>([])
   const [loading, setLoading] = useState(false)
-  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS as `0x${string}`;
+  const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
 
   useEffect(() => {
     loadListedNFTs();
@@ -191,11 +196,11 @@ export default function NFTMarketplace() {
     setLoading(true);
 
     try {
-      console.log("📡 Fetching getAllListedProducts from:", MULTI_PRODUCT_ADDRESS);
+      console.log("📡 Fetching getAllListedProducts from:", PRODUCT_NFT_ADDRESS);
       
       // ✅ Properly typed response
       const response = await readContract(config, {
-        address: MULTI_PRODUCT_ADDRESS,
+        address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
         functionName: "getAllListedProducts",
       }) as { result: [bigint[], any[]] } | [bigint[], any[]];
@@ -235,45 +240,149 @@ export default function NFTMarketplace() {
             // Get token URI
             const uri = product.tokenURI || "";
 
-            // Normalize IPFS URI
+            // Extract CID from URI
+            let cid = uri;
+            if (uri.startsWith("ipfs://")) {
+              cid = uri.replace("ipfs://", "");
+            } else if (uri.includes("ipfs/")) {
+              cid = uri.split("ipfs/").pop() || uri;
+            }
+            
+            // Normalize IPFS URI to full gateway URL
             let metadataUrl = uri;
             if (uri.startsWith("ipfs://")) {
-              metadataUrl = uri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+              metadataUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
             } else if (!uri.startsWith("http")) {
-              metadataUrl = `https://gateway.pinata.cloud/ipfs/${uri}`;
+              metadataUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
             }
+            console.log(`Token ${tid} - CID:`, cid);
 
-            // Fetch JSON metadata
+            // Fetch JSON metadata with gateway fallback
             let metadata: NFTMetadata = {
               name: product.name || `Token #${tid}`,
               description: product.description || "No description available",
-              image: "",
+              image: "/placeholder.png",
               attributes: []
             };
 
-            try {
-              const response = await fetch(metadataUrl);
-              if (response.ok) {
-                metadata = await response.json();
+            // Array of IPFS gateways to try (in order of preference)
+            const gateways = [
+              metadataUrl.replace("gateway.pinata.cloud", "cloudflare-ipfs.com"),
+              metadataUrl.replace("https://gateway.pinata.cloud/ipfs/", "https://ipfs.io/ipfs/"),
+              metadataUrl, // Original gateway as fallback
+            ];
+
+            let fetchSuccess = false;
+            for (const gatewayUrl of gateways) {
+              try {
+                console.log(`Token ${tid} - Trying gateway:`, gatewayUrl);
+                const response = await fetch(gatewayUrl, {
+                  signal: AbortSignal.timeout(5000),
+                  headers: { "Accept": "application/json" }
+                });
+
+                if (response.ok) {
+                  const fetchedData = await response.json();
+                  console.log(`Token ${tid} - Successfully fetched metadata`);
+                  metadata = {
+                    name: fetchedData.name || product.name || `Token #${tid}`,
+                    description: fetchedData.description || product.description || "No description available",
+                    image: fetchedData.image || "/placeholder.png",
+                    attributes: fetchedData.attributes || []
+                  };
+                  fetchSuccess = true;
+                  break;
+                }
+              } catch (err) {
+                console.warn(`Token ${tid} - Failed to fetch from ${gatewayUrl}`);
+                continue;
               }
-            } catch (err) {
-              console.warn(`⚠️ Failed to fetch metadata for token ${tid}:`, err);
             }
 
-            // Normalize image URL
-            let imageUrl = metadata.image || "";
-            if (imageUrl.startsWith("ipfs://")) {
-              imageUrl = imageUrl.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
+            if (!fetchSuccess) {
+              console.warn(`Token ${tid} - Could not fetch metadata from any gateway`);
             }
 
-            // ✅ Get type from productType (bytes32)
-            const typeBytes = product.productType;
+            // Fetch image using URL from metadata with gateway fallback
+            let imageUrl = "/placeholder.png";
+            const imageSource = metadata.image;
+            
+            if (imageSource && imageSource !== "/placeholder.png") {
+              try {
+                // Construct proper gateway URLs
+                let primaryImageUrl = imageSource;
+                
+                // If it's just a CID, add the gateway prefix
+                if (!imageSource.startsWith("http")) {
+                  if (imageSource.startsWith("ipfs://")) {
+                    primaryImageUrl = imageSource.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
+                  } else {
+                    primaryImageUrl = `https://cloudflare-ipfs.com/ipfs/${imageSource}`;
+                  }
+                }
+                
+                // Alternative image gateways
+                const imageGateways = [
+                  primaryImageUrl,
+                  primaryImageUrl.replace("cloudflare-ipfs.com", "ipfs.io"),
+                  primaryImageUrl.replace("cloudflare-ipfs.com", "gateway.pinata.cloud"),
+                ];
+                
+                let imageFetchSuccess = false;
+                for (const imgGatewayUrl of imageGateways) {
+                  try {
+                    console.log(`Token ${tid} - Fetching image from:`, imgGatewayUrl);
+                    
+                    const imageResponse = await fetch(imgGatewayUrl, {
+                      signal: AbortSignal.timeout(5000)
+                    });
+                    
+                    if (imageResponse.ok) {
+                      const imageBlob = await imageResponse.blob();
+                      imageUrl = URL.createObjectURL(imageBlob);
+                      console.log(`Token ${tid} - Image fetched successfully`);
+                      imageFetchSuccess = true;
+                      break;
+                    }
+                  } catch (imgErr) {
+                    console.warn(`Token ${tid} - Failed to fetch image from ${imgGatewayUrl}`);
+                    continue;
+                  }
+                }
+                
+                if (!imageFetchSuccess) {
+                  console.warn(`Token ${tid} - Could not fetch image from any gateway`);
+                  imageUrl = "/placeholder.png";
+                }
+              } catch (imgErr) {
+                console.warn(`Token ${tid} - Image fetch error:`, imgErr);
+                imageUrl = "/placeholder.png";
+              }
+            }
+
+            // ✅ Get type from metadata attributes or fallback to productType
             let typeString = "virtual";
             
-            if (typeof typeBytes === "string") {
-              typeString = typeBytes === "0x7669727475616c0000000000000000000000000000000000000000000000000000" 
-                ? "virtual" 
-                : "physical";
+            // Try to find type/category from metadata attributes
+            if (metadata.attributes && metadata.attributes.length > 0) {
+              const typeAttr = metadata.attributes.find(
+                (attr: any) => attr.trait_type?.toLowerCase() === "type" || 
+                               attr.trait_type?.toLowerCase() === "category" ||
+                               attr.trait_type?.toLowerCase() === "product type"
+              );
+              
+              if (typeAttr) {
+                const attrValue = String(typeAttr.value).toLowerCase();
+                typeString = attrValue.includes("physical") ? "physical" : "virtual";
+              } else {
+                // Fallback to productType if no type attribute in metadata
+                const typeBytes = product.productType;
+                if (typeof typeBytes === "string") {
+                  typeString = typeBytes === "0x7669727475616c0000000000000000000000000000000000000000000000000000" 
+                    ? "virtual" 
+                    : "physical";
+                }
+              }
             }
 
             return {
@@ -285,6 +394,7 @@ export default function NFTMarketplace() {
               price: (Number(product.price) / 1e18).toFixed(4),
               type: typeString,
               merchant: product.merchant || "Unknown",
+              attributes: metadata.attributes || [],
             };
           } catch (err) {
             console.error(`❌ Failed to process token ${tid}:`, err);
