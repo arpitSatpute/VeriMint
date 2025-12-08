@@ -94,15 +94,10 @@ export default function ProductDetails() {
   useEffect(() => {
     window.scroll(0, 0);
 
-    console.log("🚀 ProductDetails component mounted");
-    console.log("📍 URL Parameter 'id':", id);
-    console.log("📦 Location State:", location.state);
-    
     // Check if data was passed from Product page
     const productData = (location.state as any)?.productData;
     
     if (productData) {
-      console.log("✅ Product data received from navigation state:", productData);
       setNft(productData);
     } else {
       console.warn("⚠️ No product data passed from Product page");
@@ -110,18 +105,14 @@ export default function ProductDetails() {
 
     setLoading(false);
 
-    return () => {
-      console.log("🔚 ProductDetails component unmounted");
-    };
+    return () => {};
   }, [id, location.state]);
 
   const handleBuyNow = () => {
-    console.log("💳 Buy Now clicked for:", nft?.tokenId);
     alert('Redirecting to purchase page...')
   }
 
   const handleShare = () => {
-    console.log("🔗 Share clicked, copying URL:", window.location.href);
     navigator.clipboard.writeText(window.location.href)
     alert('Link copied to clipboard!')
   }

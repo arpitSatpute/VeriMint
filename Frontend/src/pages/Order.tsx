@@ -156,7 +156,7 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
   )
 }
 
-export default function OrdersDashboard() {
+export default function Order() {
   const [viewMode, setViewMode] = useState('buyer')
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')

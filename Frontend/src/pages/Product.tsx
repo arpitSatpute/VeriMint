@@ -80,7 +80,6 @@ function NFTCard({ nft, index }: NFTCardProps) {
   }
 
   const handleCardClick = () => {
-    console.log("🖱️ NFT Card clicked, navigating to:", `/productDetails/${nft.tokenId}`);
     navigate(`/productDetails/${nft.tokenId}`, { 
       state: { productData: nft }
     });
@@ -88,7 +87,6 @@ function NFTCard({ nft, index }: NFTCardProps) {
 
   const handleBuyNowClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log("💳 Buy Now clicked for token:", nft.tokenId);
     navigate(`/productDetails/${nft.tokenId}`, { 
       state: { productData: nft }
     });
@@ -181,7 +179,7 @@ function NFTCard({ nft, index }: NFTCardProps) {
   )
 }
 
-export default function NFTMarketplace() {
+export default function Product() {
   const [activeFilter, setActiveFilter] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [nfts, setNfts] = useState<ListedNFT[]>([])
@@ -196,8 +194,6 @@ export default function NFTMarketplace() {
     setLoading(true);
 
     try {
-      console.log("📡 Fetching getAllListedProducts from:", PRODUCT_NFT_ADDRESS);
-      
       // ✅ Properly typed response
       const response = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
@@ -217,10 +213,7 @@ export default function NFTMarketplace() {
         throw new Error("Invalid response format from getAllListedProducts");
       }
 
-      console.log("✅ Got response - Token IDs:", tokenIds.length, "Products:", products.length);
-
       if (!tokenIds || tokenIds.length === 0) {
-        console.log("⚠️ No listed products found");
         setNfts([]);
         setLoading(false);
         return;
@@ -255,7 +248,6 @@ export default function NFTMarketplace() {
             } else if (!uri.startsWith("http")) {
               metadataUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
             }
-            console.log(`Token ${tid} - CID:`, cid);
 
             // Fetch JSON metadata with gateway fallback
             let metadata: NFTMetadata = {
@@ -275,7 +267,6 @@ export default function NFTMarketplace() {
             let fetchSuccess = false;
             for (const gatewayUrl of gateways) {
               try {
-                console.log(`Token ${tid} - Trying gateway:`, gatewayUrl);
                 const response = await fetch(gatewayUrl, {
                   signal: AbortSignal.timeout(5000),
                   headers: { "Accept": "application/json" }
@@ -283,7 +274,6 @@ export default function NFTMarketplace() {
 
                 if (response.ok) {
                   const fetchedData = await response.json();
-                  console.log(`Token ${tid} - Successfully fetched metadata`);
                   metadata = {
                     name: fetchedData.name || product.name || `Token #${tid}`,
                     description: fetchedData.description || product.description || "No description available",
@@ -331,8 +321,6 @@ export default function NFTMarketplace() {
                 let imageFetchSuccess = false;
                 for (const imgGatewayUrl of imageGateways) {
                   try {
-                    console.log(`Token ${tid} - Fetching image from:`, imgGatewayUrl);
-                    
                     const imageResponse = await fetch(imgGatewayUrl, {
                       signal: AbortSignal.timeout(5000)
                     });
@@ -340,7 +328,6 @@ export default function NFTMarketplace() {
                     if (imageResponse.ok) {
                       const imageBlob = await imageResponse.blob();
                       imageUrl = URL.createObjectURL(imageBlob);
-                      console.log(`Token ${tid} - Image fetched successfully`);
                       imageFetchSuccess = true;
                       break;
                     }
@@ -404,7 +391,6 @@ export default function NFTMarketplace() {
       );
 
       const validNfts = nftData.filter((n) => n !== null) as ListedNFT[];
-      console.log("✅ Loaded NFTs:", validNfts);
       setNfts(validNfts);
     } catch (error) {
       console.error("❌ Failed to load listed NFTs:", error);

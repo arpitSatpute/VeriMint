@@ -221,7 +221,7 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
   )
 }
 
-export default function MerchantDashboard() {
+export default function Merchant() {
   const { address } = useAccount();
   const [nfts, setNfts] = useState<MerchantNFT[]>([]);
   const [loading, setLoading] = useState(false);
@@ -302,7 +302,6 @@ export default function MerchantDashboard() {
             // Use product.tokenURI as fallback if uri is empty
             if (!uri || uri.trim() === "") {
               uri = product.tokenURI;
-              console.log(`Token ${tid} - URI was empty, using product.tokenURI:`, uri);
             }
 
             // Validate URI exists before constructing metadata URL
@@ -318,7 +317,6 @@ export default function MerchantDashboard() {
             } else if (!uri.startsWith("http")) {
               metadataUrl = `https://gateway.pinata.cloud/ipfs/${uri}`;
             }
-            console.log(`Token ${tid} - Metadata URL:`, metadataUrl);
 
             // Get isListed and balance in parallel
             const [isListed, balance] = await Promise.all([
@@ -353,7 +351,6 @@ export default function MerchantDashboard() {
             let fetchSuccess = false;
             for (const gatewayUrl of gateways) {
               try {
-                console.log(`Token ${tid} - Trying gateway:`, gatewayUrl);
                 const response = await fetch(gatewayUrl, {
                   signal: AbortSignal.timeout(5000), // 5 second timeout
                   headers: {
@@ -363,7 +360,6 @@ export default function MerchantDashboard() {
 
                 if (response.ok) {
                   const fetchedData = await response.json();
-                  console.log(`Token ${tid} - Successfully fetched metadata from:`, gatewayUrl);
                   metadata = {
                     name: fetchedData.name || product.name,
                     description: fetchedData.description || product.description,
@@ -411,8 +407,6 @@ export default function MerchantDashboard() {
                 let imageFetchSuccess = false;
                 for (const imgGatewayUrl of imageGateways) {
                   try {
-                    console.log(`Token ${tid} - Fetching image from:`, imgGatewayUrl);
-                    
                     const imageResponse = await fetch(imgGatewayUrl, {
                       signal: AbortSignal.timeout(5000)
                     });
@@ -420,7 +414,6 @@ export default function MerchantDashboard() {
                     if (imageResponse.ok) {
                       const imageBlob = await imageResponse.blob();
                       imageUrl = URL.createObjectURL(imageBlob);
-                      console.log(`Token ${tid} - Image fetched successfully`);
                       imageFetchSuccess = true;
                       break;
                     }
@@ -471,7 +464,7 @@ export default function MerchantDashboard() {
               name: metadata.name || `Token #${tid}`,
               description: metadata.description || "No description available",
               image: imageUrl,
-              price: (product.price / BigInt(10 ** 18)).toString(),
+              price: (Number(product.price) / 1e18).toFixed(4),
               supply: balance.toString(),
               type,
               isListed,
@@ -493,7 +486,6 @@ export default function MerchantDashboard() {
   };
 
   const handleBurn = (id: number) => {
-    console.log('Burning NFT:', id)
     alert(`Burn confirmation for NFT #${id}`)
   }
 
