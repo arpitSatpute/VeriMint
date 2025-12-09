@@ -229,7 +229,7 @@ export default function Merchant() {
   const [showMintModal, setShowMintModal] = useState(false)
   const navigate = useNavigate();
 
-  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
+  const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
 
   useEffect(() => {
     if (!address) return;
@@ -248,7 +248,7 @@ export default function Merchant() {
       for (let i = 0n; i < 1000n; i++) {
         try {
           const tokenId = (await readContract(config, {
-            address: MULTI_PRODUCT_ADDRESS,
+            address: PRODUCT_NFT_ADDRESS,
             abi: PRODUCT_NFT_ABI,
             functionName: "merchantProducts",
             args: [address, i],
@@ -277,7 +277,7 @@ export default function Merchant() {
           try {
             // Get token URI from contract
             let uri = (await readContract(config, {
-              address: MULTI_PRODUCT_ADDRESS,
+              address: PRODUCT_NFT_ADDRESS,
               abi: PRODUCT_NFT_ABI,
               functionName: "uri",
               args: [BigInt(tid)],
@@ -285,7 +285,7 @@ export default function Merchant() {
 
             // Get product data for basic info
             const product = (await readContract(config, {
-              address: MULTI_PRODUCT_ADDRESS,
+              address: PRODUCT_NFT_ADDRESS,
               abi: PRODUCT_NFT_ABI,
               functionName: "getProduct",
               args: [BigInt(tid)],
@@ -321,13 +321,13 @@ export default function Merchant() {
             // Get isListed and balance in parallel
             const [isListed, balance] = await Promise.all([
               readContract(config, {
-                address: MULTI_PRODUCT_ADDRESS,
+                address: PRODUCT_NFT_ADDRESS,
                 abi: PRODUCT_NFT_ABI,
                 functionName: "isProductListed",
                 args: [BigInt(tid)],
               }) as Promise<boolean>,
               readContract(config, {
-                address: MULTI_PRODUCT_ADDRESS,
+                address: PRODUCT_NFT_ADDRESS,
                 abi: PRODUCT_NFT_ABI,
                 functionName: "balanceOf",
                 args: [address, BigInt(tid)],
@@ -496,7 +496,7 @@ export default function Merchant() {
     try {
       // 1. Write the transaction - listProduct(tokenId)
       const txHash = await writeContract(config, {
-        address: MULTI_PRODUCT_ADDRESS,
+        address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
         functionName: "listProduct",
         args: [BigInt(nft.tokenId)],
@@ -527,7 +527,7 @@ export default function Merchant() {
     
     try {
       const txHash = await writeContract(config, {
-        address: MULTI_PRODUCT_ADDRESS,
+        address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
         functionName: "unlistProduct",
         args: [BigInt(nft.tokenId)],
