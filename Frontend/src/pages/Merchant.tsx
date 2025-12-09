@@ -221,7 +221,7 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
   )
 }
 
-export default function Merchant() {
+function Merchant() {
   const { address } = useAccount();
   const [nfts, setNfts] = useState<MerchantNFT[]>([]);
   const [loading, setLoading] = useState(false);
@@ -838,3 +838,5 @@ export default function Merchant() {
     </DefaultLayout>
   )
 }
+
+export default Merchant;
