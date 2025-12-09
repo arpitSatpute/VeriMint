@@ -258,7 +258,10 @@ export default function Product() {
             };
 
             // Array of IPFS gateways to try (in order of preference)
+            // Extract CID for custom Pinata gateway
+            const customPinataGateway = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${cid}`;
             const gateways = [
+              customPinataGateway, // Primary: Custom Pinata gateway (Cloudflare-backed, CORS enabled)
               metadataUrl.replace("gateway.pinata.cloud", "cloudflare-ipfs.com"),
               metadataUrl.replace("https://gateway.pinata.cloud/ipfs/", "https://ipfs.io/ipfs/"),
               metadataUrl, // Original gateway as fallback
