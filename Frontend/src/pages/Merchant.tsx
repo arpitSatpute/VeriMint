@@ -394,23 +394,19 @@ function Merchant() {
             
             if (imageSource && imageSource !== "/placeholder.png") {
               try {
-                // Construct proper gateway URLs
-                let primaryImageUrl = imageSource;
-                
-                // If it's just a CID, add the gateway prefix
-                if (!imageSource.startsWith("http")) {
-                  if (imageSource.startsWith("ipfs://")) {
-                    primaryImageUrl = imageSource.replace("ipfs://", "https://cloudflare-ipfs.com/ipfs/");
-                  } else {
-                    primaryImageUrl = `https://cloudflare-ipfs.com/ipfs/${imageSource}`;
-                  }
+                // Extract CID from image source
+                let imageCid = imageSource;
+                if (imageSource.startsWith("ipfs://")) {
+                  imageCid = imageSource.replace("ipfs://", "");
+                } else if (imageSource.includes("ipfs/")) {
+                  imageCid = imageSource.split("ipfs/").pop() || imageSource;
                 }
                 
-                // Alternative image gateways
+                // Priority: Custom Pinata → IPFS.io → IPFS.io fallback
                 const imageGateways = [
-                  primaryImageUrl,
-                  primaryImageUrl.replace("cloudflare-ipfs.com", "ipfs.io"),
-                  primaryImageUrl.replace("cloudflare-ipfs.com", "gateway.pinata.cloud"),
+                  `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`, // Primary
+                  `https://ipfs.io/ipfs/${imageCid}`, // Secondary
+                  imageSource.startsWith("http") ? imageSource : `https://ipfs.io/ipfs/${imageCid}`, // Fallback
                 ];
                 
                 let imageFetchSuccess = false;
