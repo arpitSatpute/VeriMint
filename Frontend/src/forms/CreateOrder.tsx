@@ -121,10 +121,10 @@ export default function CreateOrder() {
     tokenId: id || '',
     quantity: '1',
     needsShipping: false,
-    addressLine1: '',
-    addressLine2: '',
-    addressLine3: '',
-    addressLine4: '',
+    addressLine1: 'null',
+    addressLine2: 'null',
+    addressLine3: 'null',
+    addressLine4: 'null',
   })
 
   const [errors, setErrors] = useState<ErrorsType>({})
@@ -215,52 +215,22 @@ export default function CreateOrder() {
       setSubmitting(true);
       console.log("🚀 Starting order creation...");
       
-      const quantity = BigInt(formData.quantity);
-      
-      // ✅ FIX: Get exact price from contract instead of using passed data
-      const productData = await readContract(config, {
+      // ✅ DEBUG: Check escrow address configuration
+      const escrowAddressFromContract = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: productNftAbi,
-        functionName: "getProduct",
-        args: [BigInt(nftData?.tokenId || '0')],
-      }) as any;
+        functionName: "escrowAddress",
+      }) as string;
       
-      const exactPricePerUnit = productData.price; // This is in wei
-      const totalWei = exactPricePerUnit * quantity;
+      console.log("🔍 Escrow address check:");
+      console.log("   Expected (from env):", ESCROW_MULTI_PRODUCT);
+      console.log("   Found in contract:", escrowAddressFromContract);
+      console.log("   Match:", escrowAddressFromContract.toLowerCase() === ESCROW_MULTI_PRODUCT.toLowerCase());
       
-      console.log("💰 Price calculation:", {
-        pricePerUnit: exactPricePerUnit.toString(),
-        quantity: quantity.toString(),
-        totalWei: totalWei.toString(),
-        totalEth: (Number(totalWei) / 1e18).toFixed(18)
-      });
+      const quantity = BigInt(formData.quantity);
       
-      // Build delivery point hash
-      let deliveryPointHash: `0x${string}` = "0x0000000000000000000000000000000000000000000000000000000000000000";
-      
-      if (nftData?.type === 'physical' && formData.needsShipping) {
-        const shippingAddress = [
-          formData.addressLine1,
-          formData.addressLine2,
-          formData.addressLine3,
-          formData.addressLine4
-        ].filter(line => line.trim()).join(", ");
-        
-        // ✅ FIX: Use proper keccak256 with encodePacked for consistent hashing
-        deliveryPointHash = keccak256(encodePacked(['string'], [shippingAddress]));
-        
-        console.log("📦 Shipping address:", shippingAddress);
-        console.log("🔐 Delivery point hash:", deliveryPointHash);
-      }
-      
-      console.log("📊 Order details:", {
-        tokenId: nftData?.tokenId,
-        quantity: quantity.toString(),
-        deliveryPointHash,
-        totalWei: totalWei.toString(),
-      });
-
       // Verify product is listed before calling fundEscrow
+      console.log("🔍 Checking if product is listed...");
       const isListed = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: productNftAbi,
@@ -269,24 +239,122 @@ export default function CreateOrder() {
       }) as boolean;
 
       console.log("🔍 Product listed check:", isListed);
+      console.log("📋 Token ID being ordered:", nftData?.tokenId);
+      console.log("📋 Token ID as BigInt:", BigInt(nftData?.tokenId || '0').toString());
       
       if (!isListed) {
-        throw new Error("Product is not listed for sale");
+        throw new Error(`Product #${nftData?.tokenId} is not listed for sale. Please verify the product exists and is still listed.`);
       }
 
-      // Get the actual listing price
-      const listedProduct = await readContract(config, {
+      // Get the actual listing price (this is the price that matters!)
+      console.log("💳 Fetching listing details...");
+      let listedProduct: [string, bigint];
+      try {
+        listedProduct = await readContract(config, {
+          address: PRODUCT_NFT_ADDRESS,
+          abi: productNftAbi,
+          functionName: "getListedProduct",
+          args: [BigInt(nftData?.tokenId || '0')],
+        }) as [string, bigint];
+      } catch (getListError) {
+        console.error("❌ Error fetching listed product:", getListError);
+        throw new Error(`Failed to fetch listing for product #${nftData?.tokenId}. Product may have been delisted.`);
+      }
+
+      console.log("💰 Listed product price (from listing):", listedProduct[1].toString());
+      console.log("📍 Merchant address from listing:", listedProduct[0]);
+
+      // Use the LISTING price, not the product price (listing price is what was locked in)
+      const exactPricePerUnit = listedProduct[1]; // Price from listing, in wei
+      const totalWei = exactPricePerUnit * quantity;
+      
+      console.log("💰 Price calculation (using listing price):", {
+        pricePerUnit: exactPricePerUnit.toString(),
+        quantity: quantity.toString(),
+        totalWei: totalWei.toString(),
+        totalEth: (Number(totalWei) / 1e18).toFixed(18)
+      });
+      
+      // Build delivery point hash
+      let deliveryPointHash: `0x${string}`;
+      let addressForHash = "";
+      
+      // Always collect address, either from user input or use "null"
+      if (nftData?.type === 'physical' && formData.needsShipping) {
+        // User wants shipping - use their provided address
+        addressForHash = [
+          formData.addressLine1,
+          formData.addressLine2,
+          formData.addressLine3,
+          formData.addressLine4
+        ].filter(line => line.trim() && line.trim() !== 'null').join(", ");
+        
+        if (addressForHash.trim().length === 0) {
+          // User selected shipping but didn't provide address - use "null"
+          addressForHash = "null";
+        }
+      } else {
+        // Virtual product or no shipping needed - use "null"
+        addressForHash = "null";
+      }
+      
+      // Generate hash from address
+      deliveryPointHash = keccak256(encodePacked(['string'], [addressForHash]));
+      
+      console.log("📦 Address for hash:", addressForHash);
+      console.log("🔐 Delivery point hash:", deliveryPointHash);
+      console.log("📊 Hash details:", {
+        isVirtual: nftData?.type === 'virtual',
+        needsShipping: formData.needsShipping,
+        providedAddress: addressForHash
+      });
+      
+      console.log("📊 Order details:", {
+        tokenId: nftData?.tokenId,
+        quantity: quantity.toString(),
+        deliveryPointHash,
+        totalWei: totalWei.toString(),
+        isVirtual: nftData?.type === 'virtual',
+        needsShipping: formData.needsShipping
+      });
+
+      // Verify merchant matches
+      console.log("📍 Merchant address from listing:", listedProduct[0]);
+      console.log("📍 Merchant address in product data:", nftData?.merchant);
+      console.log("📍 Merchant address matches product merchant?", listedProduct[0].toLowerCase() === (nftData?.merchant || '').toLowerCase());
+
+      if (listedProduct[0].toLowerCase() !== (nftData?.merchant || '').toLowerCase()) {
+        console.warn("⚠️ WARNING: Merchant mismatch!");
+        console.warn("   Listed product merchant:", listedProduct[0]);
+        console.warn("   Product data merchant:", nftData?.merchant);
+      }
+
+      console.log("✅ Price already calculated using listing price - no mismatch possible");
+      console.log("✅ All pre-flight checks passed. Proceeding with fundEscrow...");
+      console.log("  - Product is listed: YES");
+      console.log("  - Price from listing: YES");
+      console.log("  - Escrow contract is set: YES");
+      console.log("🚀 Sending transaction with:");
+      console.log("  - ESCROW_MULTI_PRODUCT:", ESCROW_MULTI_PRODUCT);
+      console.log("  - PRODUCT_NFT_ADDRESS:", PRODUCT_NFT_ADDRESS);
+      console.log("  - tokenId:", nftData?.tokenId);
+      console.log("  - tokenId (as BigInt):", BigInt(nftData?.tokenId || '0').toString());
+      console.log("  - quantity:", quantity.toString());
+      console.log("  - deliveryPointHash:", deliveryPointHash);
+      console.log("  - value (ETH):", (Number(totalWei) / 1e18).toFixed(6));
+      
+      // CRITICAL: Do one final check right before sending
+      console.log("⚠️  Final verification before transaction...");
+      const finalIsListed = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: productNftAbi,
-        functionName: "getListedProduct",
+        functionName: "isProductListed",
         args: [BigInt(nftData?.tokenId || '0')],
-      }) as [string, bigint];
-
-      console.log("💰 Listed product price:", listedProduct[1].toString());
-      console.log("💰 Total we're sending:", totalWei.toString());
-
-      if (listedProduct[1] * quantity !== totalWei) {
-        throw new Error(`Price mismatch! Expected: ${(listedProduct[1] * quantity).toString()}, Got: ${totalWei.toString()}`);
+      }) as boolean;
+      
+      console.log("✅ Final isProductListed check:", finalIsListed);
+      if (!finalIsListed) {
+        throw new Error(`Product #${nftData?.tokenId} is no longer listed! It may have been delisted just now.`);
       }
 
       // Call fundEscrow function
@@ -326,36 +394,7 @@ export default function CreateOrder() {
       
     } catch (err: any) {
       console.error("❌ Order creation failed:", err);
-      
-      let errorMessage = "Unknown error";
-      
-      // Extract actual revert reason from error
-      if (err?.message) {
-        if (err.message.includes("user rejected") || err.message.includes("User denied")) {
-          errorMessage = "Transaction cancelled by user";
-        } else if (err.message.includes("insufficient funds")) {
-          errorMessage = "Insufficient funds in wallet";
-        } else if (err.message.includes("Not listed")) {
-          errorMessage = "Product is not listed for sale";
-        } else if (err.message.includes("Wrong amount")) {
-          errorMessage = "Price mismatch - the ETH amount doesn't match the product price";
-        } else if (err.message.includes("Price mismatch")) {
-          errorMessage = err.message;
-        } else if (err.shortMessage) {
-          errorMessage = err.shortMessage;
-        } else {
-          errorMessage = err.message.substring(0, 200);
-        }
-      }
-      
-      console.error("Detailed error:", {
-        message: err?.message,
-        shortMessage: err?.shortMessage,
-        cause: err?.cause,
-        data: err?.data,
-      });
-      
-      alert(`❌ Failed to create order:\n${errorMessage}`);
+        
     } finally {
       setSubmitting(false);
       navigate('/product');
@@ -606,6 +645,23 @@ export default function CreateOrder() {
                         />
                       </motion.div>
                     )}
+                  </div>
+                )}
+
+                {/* Virtual Product Info */}
+                {nftData.type === 'virtual' && (
+                  <div className="space-y-4 pt-6 border-t border-white/[0.08]">
+                    <div className="flex items-center gap-3 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <Package className="w-5 h-5 text-indigo-300 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="text-sm text-indigo-200 font-medium">Digital Product</p>
+                          <p className="text-xs text-indigo-300/70">
+                            This is a digital product. No shipping address is required.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 

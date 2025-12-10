@@ -1,13 +1,12 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { Search, Package, ShoppingBag, Clock, CheckCircle, XCircle, Truck } from "lucide-react"
-import DefaultLayout from "@/layouts/default"
 import { useAccount } from "wagmi"
 import { readContract } from "wagmi/actions"
 import { config } from "@/config/config"
 import ORDER_MANAGER_ABI from "@/abis/orderManager.json"
-import ESCROW_ABI from "@/abis/escrowMultiProduct.json"
 import PRODUCT_NFT_ABI from "@/abis/productNft.json"
+import DefaultLayout from "@/layouts/default"
 
 type ElegantShapeProps = {
   className?: string
@@ -52,6 +51,7 @@ type OrderState = 'Created' | 'Released' | 'Cancelled'
 
 interface OrderType {
   id: number
+  orderId: string
   tokenId: string
   name: string
   price: string
@@ -124,6 +124,8 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
             <div className="flex items-center gap-3 text-sm text-white/50">
               <span className="font-mono">#{order.tokenId}</span>
               <span>•</span>
+              <span>Order #{order.orderId}</span>
+              <span>•</span>
               <span>Qty: {order.supply}</span>
             </div>
           </div>
@@ -158,7 +160,7 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
             whileTap={{ scale: 0.95 }}
             className="px-4 py-2 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white/70 text-sm font-medium hover:border-white/[0.15] hover:text-white/90 transition-all shrink-0"
           >
-            View
+            View Details
           </motion.button>
         </div>
       </div>
@@ -176,7 +178,6 @@ export default function Order() {
   const [loading, setLoading] = useState(false)
 
   const ORDER_MANAGER_ADDRESS = import.meta.env.VITE_ORDER_MANAGER_ADDRESS as `0x${string}`
-  const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`
   const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`
 
   useEffect(() => {
@@ -186,7 +187,6 @@ export default function Order() {
   }, [address, viewMode])
 
   const mapDeliveryStatusToDisplay = (deliveryStatus: number): 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled' => {
-    // DeliveryStatus enum: Pending=0, InTransit=1, Delivered=2, Failed=3
     switch (deliveryStatus) {
       case 0: return 'pending'
       case 1: return 'processing'
@@ -197,7 +197,6 @@ export default function Order() {
   }
 
   const mapOrderStateToDisplay = (orderState: number, deliveryStatus: number): 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled' => {
-    // OrderState enum: Created=0, Released=1, Cancelled=2
     if (orderState === 2) return 'cancelled'
     if (orderState === 1) return 'completed'
     return mapDeliveryStatusToDisplay(deliveryStatus)
@@ -210,7 +209,7 @@ export default function Order() {
     try {
       console.log("🔍 Loading orders for address:", address)
       
-      // Get order IDs for current user based on view mode
+      // Step 1: Get order IDs based on view mode
       const orderIds = viewMode === 'buyer'
         ? (await readContract(config, {
             address: ORDER_MANAGER_ADDRESS,
@@ -225,112 +224,178 @@ export default function Order() {
             args: [address],
           }) as bigint[])
 
-      const totalUserOrders = orderIds.length
-      console.log(`📦 Total ${viewMode} orders:`, totalUserOrders)
+      console.log(`📦 Found ${orderIds.length} ${viewMode} orders`)
 
-      if (totalUserOrders === 0) {
+      if (orderIds.length === 0) {
         setOrders([])
         setLoading(false)
         return
       }
 
-      // Fetch all orders in parallel
-      const orderPromises: Promise<OrderType | null>[] = orderIds.map(
-        (orderId) =>
-          (async () => {
-            try {
-              const orderData = await readContract(config, {
-                address: ORDER_MANAGER_ADDRESS,
-                abi: ORDER_MANAGER_ABI,
-                functionName: "getOrder",
-                args: [orderId],
-              }) as any
+      // Step 2: Fetch all orders in parallel
+      const orderPromises = orderIds.map(async (orderId) => {
+        try {
+          // Step 2a: Get order data
+          const orderData = await readContract(config, {
+            address: ORDER_MANAGER_ADDRESS,
+            abi: ORDER_MANAGER_ABI,
+            functionName: "getOrder",
+            args: [orderId],
+          }) as any
 
-              const orderMetaData = await readContract(config, {
-                address: ORDER_MANAGER_ADDRESS,
-                abi: ORDER_MANAGER_ABI,
-                functionName: "getOrderMeta",
-                args: [orderId],
-              }) as any
+          // Step 2b: Get order metadata
+          const orderMetaData = await readContract(config, {
+            address: ORDER_MANAGER_ADDRESS,
+            abi: ORDER_MANAGER_ABI,
+            functionName: "getOrderMeta",
+            args: [orderId],
+          }) as any
 
-              // Get product details
-              const productData = await readContract(config, {
-                address: PRODUCT_NFT_ADDRESS,
-                abi: PRODUCT_NFT_ABI,
-                functionName: "getProduct",
-                args: [orderData.tokenId],
-              }) as any
+          const tokenId = orderData.tokenId
 
-              // Get product metadata for image
-              let imageUrl = "/placeholder.png"
-              let productName = productData.name || `Token #${orderData.tokenId}`
+          // Step 3: Get product URI using tokenId
+          let uri = await readContract(config, {
+            address: PRODUCT_NFT_ADDRESS,
+            abi: PRODUCT_NFT_ABI,
+            functionName: "uri",
+            args: [tokenId],
+          }) as string
 
+          // If uri is empty, try getting from product data
+          if (!uri || uri.trim() === "") {
+            const product = await readContract(config, {
+              address: PRODUCT_NFT_ADDRESS,
+              abi: PRODUCT_NFT_ABI,
+              functionName: "getProduct",
+              args: [tokenId],
+            }) as any
+            uri = product.tokenURI
+          }
+
+          console.log(`📄 Order ${orderId}: URI = ${uri}`)
+
+          // Step 4: Extract CID and fetch metadata from IPFS
+          let metadata: any = {
+            name: `Token #${tokenId}`,
+            description: "",
+            image: "/placeholder.png",
+            attributes: []
+          }
+
+          if (uri && uri.trim() !== "") {
+            // Extract CID from URI
+            let cid = uri
+            if (uri.startsWith("ipfs://")) {
+              cid = uri.replace("ipfs://", "")
+            } else if (uri.includes("ipfs/")) {
+              cid = uri.split("ipfs/").pop() || uri
+            }
+
+            // Try multiple IPFS gateways
+            const gateways = [
+              `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${cid}`,
+              `https://gateway.pinata.cloud/ipfs/${cid}`,
+              `https://ipfs.io/ipfs/${cid}`,
+            ]
+
+            for (const gatewayUrl of gateways) {
               try {
-                const uri = await readContract(config, {
-                  address: PRODUCT_NFT_ADDRESS,
-                  abi: PRODUCT_NFT_ABI,
-                  functionName: "uri",
-                  args: [orderData.tokenId],
-                }) as string
+                const response = await fetch(gatewayUrl, {
+                  signal: AbortSignal.timeout(5000),
+                  headers: { "Accept": "application/json" }
+                })
 
-                if (uri) {
-                  let cid = uri.startsWith("ipfs://") ? uri.replace("ipfs://", "") : uri
-                  const metadataUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${cid}`
-                  
-                  const response = await fetch(metadataUrl, { signal: AbortSignal.timeout(5000) })
-                  if (response.ok) {
-                    const metadata = await response.json()
-                    if (metadata.image) {
-                      const imageCid = metadata.image.startsWith("ipfs://") 
-                        ? metadata.image.replace("ipfs://", "") 
-                        : metadata.image
-                      imageUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`
-                    }
-                    productName = metadata.name || productName
-                  }
+                if (response.ok) {
+                  metadata = await response.json()
+                  console.log(`✅ Order ${orderId}: Fetched metadata from ${gatewayUrl}`)
+                  break
                 }
               } catch (err) {
-                console.warn(`Failed to load image for order ${orderId}`)
+                console.warn(`⚠️ Failed to fetch from ${gatewayUrl}`)
+                continue
               }
-
-              // Determine product type
-              const productTypeBytes = orderMetaData.productType || productData.productType
-              const isPhysical = productTypeBytes.toLowerCase().includes("physical")
-
-              // Format date
-              const createdTimestamp = Number(orderData.createdAt)
-              const date = new Date(createdTimestamp * 1000).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric', 
-                year: 'numeric' 
-              })
-
-              // Map status
-              const deliveryStatusNum = Number(orderData.deliveryStatus)
-              const orderStateNum = Number(orderData.state)
-              const displayStatus = mapOrderStateToDisplay(orderStateNum, deliveryStatusNum)
-
-              return {
-                id: Number(orderId),
-                tokenId: orderData.tokenId.toString(),
-                name: productName,
-                price: (Number(orderMetaData.totalPrice) / 1e18).toFixed(4),
-                type: isPhysical ? 'physical' : 'virtual',
-                status: displayStatus,
-                supply: orderMetaData.supply.toString(),
-                date,
-                image: imageUrl,
-                buyerAddress: orderData.buyer,
-                merchantAddress: orderData.merchant,
-                deliveryStatus: ['Pending', 'InTransit', 'Delivered', 'Failed'][deliveryStatusNum] as DeliveryStatus,
-                orderState: ['Created', 'Released', 'Cancelled'][orderStateNum] as OrderState,
-              }
-            } catch (err) {
-              console.error(`Failed to load order ${orderId}:`, err)
-              return null
             }
-          })()
-      )
+          }
+
+          // Step 5: Fetch image from IPFS
+          let imageUrl = "/placeholder.png"
+          if (metadata.image && metadata.image !== "/placeholder.png") {
+            let imageCid = metadata.image
+            if (metadata.image.startsWith("ipfs://")) {
+              imageCid = metadata.image.replace("ipfs://", "")
+            } else if (metadata.image.includes("ipfs/")) {
+              imageCid = metadata.image.split("ipfs/").pop() || metadata.image
+            }
+
+            const imageGateways = [
+              `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`,
+              `https://ipfs.io/ipfs/${imageCid}`,
+            ]
+
+            for (const imgGatewayUrl of imageGateways) {
+              try {
+                const imageResponse = await fetch(imgGatewayUrl, {
+                  signal: AbortSignal.timeout(5000)
+                })
+
+                if (imageResponse.ok) {
+                  const imageBlob = await imageResponse.blob()
+                  imageUrl = URL.createObjectURL(imageBlob)
+                  break
+                }
+              } catch (err) {
+                continue
+              }
+            }
+          }
+
+          // Step 6: Determine product type from metadata attributes
+          let type = "virtual"
+          if (metadata.attributes && metadata.attributes.length > 0) {
+            const typeAttr = metadata.attributes.find(
+              (attr: any) => attr.trait_type?.toLowerCase() === "type" || 
+                             attr.trait_type?.toLowerCase() === "category"
+            )
+            if (typeAttr) {
+              const attrValue = String(typeAttr.value).toLowerCase()
+              type = attrValue.includes("physical") ? "physical" : "virtual"
+            }
+          }
+
+          // Step 7: Format date
+          const createdTimestamp = Number(orderData.createdAt)
+          const date = new Date(createdTimestamp * 1000).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          })
+
+          // Step 8: Map status
+          const deliveryStatusNum = Number(orderData.deliveryStatus)
+          const orderStateNum = Number(orderData.state)
+          const displayStatus = mapOrderStateToDisplay(orderStateNum, deliveryStatusNum)
+
+          return {
+            id: Number(orderId),
+            orderId: orderId.toString(),
+            tokenId: tokenId.toString(),
+            name: metadata.name || `Token #${tokenId}`,
+            price: (Number(orderMetaData.totalPrice) / 1e18).toFixed(4),
+            type,
+            status: displayStatus,
+            supply: orderMetaData.supply.toString(),
+            date,
+            image: imageUrl,
+            buyerAddress: orderData.buyer,
+            merchantAddress: orderData.merchant,
+            deliveryStatus: ['Pending', 'InTransit', 'Delivered', 'Failed'][deliveryStatusNum] as DeliveryStatus,
+            orderState: ['Created', 'Released', 'Cancelled'][orderStateNum] as OrderState,
+          }
+        } catch (err) {
+          console.error(`❌ Failed to load order ${orderId}:`, err)
+          return null
+        }
+      })
 
       const resolvedOrders = await Promise.all(orderPromises)
       const validOrders = resolvedOrders.filter((o): o is OrderType => o !== null)
@@ -338,12 +403,7 @@ export default function Order() {
       console.log("✅ Loaded orders:", validOrders.length)
       setOrders(validOrders)
     } catch (error) {
-      console.error("❌ Failed to load orders:", error);
-      console.error("Error details:", {
-        message: (error as any)?.message,
-        code: (error as any)?.code,
-        shortMessage: (error as any)?.shortMessage,
-      });
+      console.error("❌ Failed to load orders:", error)
     } finally {
       setLoading(false)
     }
@@ -353,7 +413,8 @@ export default function Order() {
     const matchesType = filterType === 'all' || order.type.toLowerCase() === filterType
     const matchesStatus = filterStatus === 'all' || order.status === filterStatus
     const matchesSearch = order.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         order.tokenId.includes(searchQuery)
+                         order.tokenId.includes(searchQuery) ||
+                         order.orderId.includes(searchQuery)
     return matchesType && matchesStatus && matchesSearch
   })
 
@@ -366,13 +427,11 @@ export default function Order() {
 
   if (!address) {
     return (
-      <DefaultLayout>
-        <div className="min-h-screen flex items-center justify-center bg-[#030303]">
-          <div className="text-center">
-            <p className="text-white/60 mb-4">Please connect your wallet to view orders</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#030303]">
+        <div className="text-center">
+          <p className="text-white/60 mb-4">Please connect your wallet to view orders</p>
         </div>
-      </DefaultLayout>
+      </div>
     )
   }
 
@@ -462,7 +521,7 @@ export default function Order() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
               <input
                 type="text"
-                placeholder="Search by name or token ID..."
+                placeholder="Search by name, token ID, or order ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-white/[0.02] border border-white/[0.08] rounded-lg text-white/80 placeholder:text-white/30 focus:border-white/[0.15] focus:outline-none transition-all text-sm"

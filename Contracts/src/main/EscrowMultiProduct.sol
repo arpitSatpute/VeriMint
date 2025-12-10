@@ -92,11 +92,9 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
 
         emit EscrowFunded(orderId, tokenId, msg.sender, merchant, totalPrice, supply);
 
-        // Auto-release for virtual or no delivery point
-        if (
-            product.productType == keccak256(abi.encodePacked("virtual")) ||
-            deliveryPointHash == bytes32(0)
-        ) {
+        // Check if delivery hash is "null" (no shipping needed) and auto-release
+        bytes32 nullHash = keccak256(abi.encodePacked("null"));
+        if (deliveryPointHash == nullHash) {
             _releaseFunds(orderId);
         }
 
