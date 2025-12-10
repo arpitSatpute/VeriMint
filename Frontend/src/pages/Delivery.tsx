@@ -181,22 +181,40 @@ export default function DeliveryPage() {
 
   const updateOrderStatus = async (newStatus: number) => {
     if (!order || !isMerchant) return
+    
+    // Validate: Can only update if physical product and not completed/cancelled
+    if (order.type !== "physical") {
+      alert("Only physical products can have delivery status updates")
+      return
+    }
+    
+    if (order.orderState !== 0) {
+      alert("Cannot update status for completed or cancelled orders")
+      return
+    }
+    
     setUpdating(true)
 
     try {
+      console.log("Updating delivery status to:", newStatus)
+      
       const tx = await writeContract(config, {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "updateDelivery",
         args: [BigInt(order.orderId), newStatus],
+        gas: 300000n,
       })
 
+      console.log("Transaction sent:", tx)
       await waitForTransactionReceipt(config, { hash: tx })
-      alert("Status updated successfully!")
+      
+      alert("✅ Status updated successfully!")
       await loadOrderDetails()
     } catch (error: any) {
       console.error("Failed to update status:", error)
-      alert(`Failed to update status: ${error?.message || "Unknown error"}`)
+      const errorMsg = error?.message || error?.shortMessage || "Unknown error"
+      alert(`❌ Failed to update status:\n${errorMsg}`)
     } finally {
       setUpdating(false)
     }
@@ -204,22 +222,45 @@ export default function DeliveryPage() {
 
   const confirmDelivery = async () => {
     if (!order) return
+    
+    // Validate: Must be buyer, physical product, and status must be InTransit (1)
+    if (order.type !== "physical") {
+      alert("Only physical products require delivery confirmation")
+      return
+    }
+    
+    if (order.deliveryStatus !== 1) {
+      alert("Delivery can only be confirmed when order is In Transit")
+      return
+    }
+    
+    if (order.orderState !== 0) {
+      alert("Cannot confirm delivery for completed or cancelled orders")
+      return
+    }
+    
     setUpdating(true)
 
     try {
+      console.log("Confirming delivery for order:", order.orderId)
+      
       const tx = await writeContract(config, {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
         functionName: "confirmDelivery",
         args: [BigInt(order.orderId)],
+        gas: 500000n,
       })
 
+      console.log("Transaction sent:", tx)
       await waitForTransactionReceipt(config, { hash: tx })
-      alert("Delivery confirmed! Funds released to merchant.")
+      
+      alert("✅ Delivery confirmed successfully! Funds have been released to the merchant.")
       await loadOrderDetails()
     } catch (error: any) {
       console.error("Failed to confirm delivery:", error)
-      alert(`Failed to confirm: ${error?.message || "Unknown error"}`)
+      const errorMsg = error?.message || error?.shortMessage || "Unknown error"
+      alert(`❌ Failed to confirm delivery:\n${errorMsg}`)
     } finally {
       setUpdating(false)
     }
@@ -303,7 +344,10 @@ export default function DeliveryPage() {
   const statusInfo = getStatusInfo(order.deliveryStatus)
   const StatusIcon = statusInfo.icon
   const canUpdateStatus = isMerchant && order.type === "physical" && order.orderState === 0
-  const canConfirmDelivery = !isMerchant && order.deliveryStatus === 1 && order.type === "physical"
+  const canConfirmDelivery = !isMerchant && 
+                            order.deliveryStatus === 1 && 
+                            order.type === "physical" && 
+                            order.orderState === 0
 
   return (
     <DefaultLayout>
@@ -429,6 +473,10 @@ export default function DeliveryPage() {
                     Merchant Controls
                   </h2>
 
+                  <p className="text-sm text-white/60 mb-4">
+                    Update the delivery status as you process and ship the order.
+                  </p>
+
                   <div className="space-y-3">
                     <button
                       onClick={() => updateOrderStatus(1)}
@@ -436,41 +484,58 @@ export default function DeliveryPage() {
                       className="w-full px-4 py-3 bg-indigo-500/20 border border-indigo-500/30 rounded-xl text-indigo-300 font-medium hover:bg-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
-                      Mark as In Transit
+                      {order.deliveryStatus >= 1 ? "Already In Transit" : "Mark as In Transit"}
                     </button>
 
-                    <button
-                      onClick={refundOrder}
-                      disabled={updating || order.orderState !== 0}
-                      className="w-full px-4 py-3 bg-rose-500/20 border border-rose-500/30 rounded-xl text-rose-300 font-medium hover:bg-rose-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
-                      Refund Order
-                    </button>
+                    {order.deliveryStatus >= 1 && (
+                      <div className="text-xs text-white/50 text-center">
+                        Status is now "In Transit". Buyer can confirm delivery when received.
+                      </div>
+                    )}
+
+                    <div className="border-t border-white/[0.08] pt-3 mt-3">
+                      <button
+                        onClick={refundOrder}
+                        disabled={updating || order.orderState !== 0}
+                        className="w-full px-4 py-3 bg-rose-500/20 border border-rose-500/30 rounded-xl text-rose-300 font-medium hover:bg-rose-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                        Refund Order
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}
 
               {/* Buyer Confirm Delivery */}
               {canConfirmDelivery && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl p-6">
-                  <h2 className="text-lg font-semibold text-white/90 mb-4 flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 backdrop-blur-sm border-2 border-emerald-500/30 rounded-2xl p-6">
+                  <h2 className="text-lg font-semibold text-emerald-300 mb-4 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5" />
                     Confirm Delivery
                   </h2>
 
-                  <p className="text-sm text-white/60 mb-4">
-                    Once you confirm delivery, funds will be released to the merchant. Please ensure you've received the product.
-                  </p>
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-4">
+                    <p className="text-sm text-emerald-200 mb-2">
+                      ✅ Order is marked as "In Transit"
+                    </p>
+                    <p className="text-xs text-emerald-300/70">
+                      Once you receive and verify the product, click below to confirm delivery and release funds to the merchant.
+                    </p>
+                  </div>
 
                   <button
                     onClick={confirmDelivery}
                     disabled={updating}
-                    className="w-full px-4 py-3 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-300 font-medium hover:bg-emerald-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full px-4 py-3 bg-emerald-500/20 border-2 border-emerald-500/50 rounded-xl text-emerald-300 font-semibold hover:bg-emerald-500/30 hover:border-emerald-500/70 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                    Confirm Delivery
+                    {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                    {updating ? "Confirming..." : "Confirm Delivery & Release Funds"}
                   </button>
+
+                  <p className="text-xs text-white/40 text-center mt-3">
+                    ⚠️ This action is irreversible and will transfer funds to the merchant
+                  </p>
                 </motion.div>
               )}
             </div>

@@ -176,10 +176,13 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
                     supply: order.supply,
                     buyerAddress: order.buyerAddress,
                     merchantAddress: order.merchantAddress,
-                    deliveryStatus: ['Pending', 'InTransit', 'Delivered', 'Failed'].indexOf(order.deliveryStatus),
-                    orderState: ['Created', 'Released', 'Cancelled'].indexOf(order.orderState),
+                    deliveryStatus: order.deliveryStatus === 'Pending' ? 0 : 
+                                  order.deliveryStatus === 'InTransit' ? 1 :
+                                  order.deliveryStatus === 'Delivered' ? 2 : 3,
+                    orderState: order.orderState === 'Created' ? 0 :
+                              order.orderState === 'Released' ? 1 : 2,
                     createdAt: new Date(order.date).getTime() / 1000,
-                    deliveryPointHash: "0x0000000000000000000000000000000000000000000000000000000000000000", // Will be fetched from contract if needed
+                    deliveryPointHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
                   }
                 }
               })
