@@ -7,6 +7,7 @@ import { config } from "@/config/config"
 import ORDER_MANAGER_ABI from "@/abis/orderManager.json"
 import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 import DefaultLayout from "@/layouts/default"
+import { useNavigate } from "react-router-dom"
 
 type ElegantShapeProps = {
   className?: string
@@ -54,6 +55,7 @@ interface OrderType {
   orderId: string
   tokenId: string
   name: string
+  description?: string
   price: string
   type: string
   status: 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled'
@@ -83,6 +85,7 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
 
   const { icon: StatusIcon, color, label } = statusConfig[order.status]
   const showAddress = isMerchant && order.status === 'processing'
+  const navigate = useNavigate();
 
   return (
     <motion.div
@@ -158,6 +161,29 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/delivery/${order.orderId}`, {
+                state: {
+                  orderData: {
+                    orderId: order.orderId,
+                    tokenId: order.tokenId,
+                    name: order.name,
+                    description: order.description || "",
+                    image: order.image,
+                    price: order.price,
+                    type: order.type,
+                    supply: order.supply,
+                    buyerAddress: order.buyerAddress,
+                    merchantAddress: order.merchantAddress,
+                    deliveryStatus: ['Pending', 'InTransit', 'Delivered', 'Failed'].indexOf(order.deliveryStatus),
+                    orderState: ['Created', 'Released', 'Cancelled'].indexOf(order.orderState),
+                    createdAt: new Date(order.date).getTime() / 1000,
+                    deliveryPointHash: "0x0000000000000000000000000000000000000000000000000000000000000000", // Will be fetched from contract if needed
+                  }
+                }
+              })
+            }}
             className="px-4 py-2 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white/70 text-sm font-medium hover:border-white/[0.15] hover:text-white/90 transition-all shrink-0"
           >
             View Details

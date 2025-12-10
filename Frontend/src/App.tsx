@@ -13,6 +13,7 @@ import VirtualProductMint from "./forms/VirtualProductMint";
 import CreateOrderForm from "./forms/CreateOrder";
 import ProductDetails from "./pages/ProductDetails";
 import Merchant from "./pages/Merchant";
+import DeliveryPage from "./pages/Delivery";
 
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ function App() {
             <Route element={<VirtualProductMint />} path="/virtualMint" />
             <Route element={<CreateOrderForm />} path="/createOrder/:id" />
             <Route element={<ProductDetails />} path="/productDetails/:id" />
+            <Route element={<DeliveryPage />} path="/delivery/:orderId" />
           </Routes>
         </QueryClientProvider>
       </ThirdwebProvider>
