@@ -34,6 +34,10 @@ interface IOrderManager {
 
     function getOrder(uint256 orderId) external view returns (Order memory);
     function getOrderMeta(uint256 orderId) external view returns (OrderMeta memory);
+    function getBuyerOrderCount(address buyer) external view returns (uint256);
+    function getMerchantOrderCount(address merchant) external view returns (uint256);
+    function getBuyerOrderIds(address buyer) external view returns (uint256[] memory);
+    function getMerchantOrderIds(address merchant) external view returns (uint256[] memory);
 
     function updateStatus(uint256 orderId, DeliveryStatus status) external;
     function confirmDelivered(uint256 orderId) external;

@@ -7,6 +7,7 @@ import "../interfaces/IProductNFT.sol";
 
 contract ProductNFT is ERC1155, Ownable, IProductNFT {
     uint256 public nextProductId;
+    uint256[] public listedProducts;
 
     address public escrowAddress;
 
@@ -14,6 +15,8 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
     mapping(uint256 => Product) public products;
     mapping(uint256 => Listing) public listings;
     mapping(address => uint256[]) public merchantProducts;
+    
+
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
@@ -56,6 +59,7 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
         require(p.price > 0, "No price");
 
         listings[tokenId] = Listing(true, p.price, block.timestamp);
+        listedProducts.push(tokenId);
     }
 
     function unlistProduct(uint256 tokenId) external {
@@ -63,7 +67,52 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
         require(msg.sender == p.merchant, "Not merchant");
 
         delete listings[tokenId];
+        removeListedProduct(tokenId);
     }
+
+    function removeListedProduct(uint256 tokenId) internal {
+        uint256 len = listedProducts.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (listedProducts[i] == tokenId) {
+                listedProducts[i] = listedProducts[len - 1]; 
+                listedProducts.pop(); 
+                break;
+            }
+        }
+    }
+
+    function getAllListedProducts() 
+        external 
+        view 
+        returns (uint256[] memory tokenIds, Product[] memory productData) 
+    {
+        uint256 count = 0;
+
+        // First pass — count active listings
+        for (uint256 i = 0; i < listedProducts.length; i++) {
+            if (listings[listedProducts[i]].listed) {
+                count++;
+            }
+        }
+
+        tokenIds = new uint256[](count);
+        productData = new Product[](count);
+
+        uint256 index = 0;
+
+        // Second pass — collect the product IDs & product data
+        for (uint256 i = 0; i < listedProducts.length; i++) {
+            uint256 tokenId = listedProducts[i];
+            if (listings[tokenId].listed) {
+                tokenIds[index] = tokenId;
+                productData[index] = products[tokenId];
+                index++;
+            }
+        }
+
+        return (tokenIds, productData);
+    }
+
 
     function adjustReserved(uint256 tokenId, uint256 supply, bool increase) external {
         require(msg.sender == escrowAddress, "Only escrow");

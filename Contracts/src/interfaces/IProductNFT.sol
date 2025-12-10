@@ -47,4 +47,7 @@ interface IProductNFT {
         uint256 amount,
         bytes memory data
     ) external;
+
+    function getAllListedProducts() external view returns (uint256[] memory tokenIds, Product[] memory productData);
+
 }

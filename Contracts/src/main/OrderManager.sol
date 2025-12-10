@@ -11,6 +11,8 @@ contract OrderManager is Ownable, IOrderManager {
 
     mapping(uint256 => Order) private orders;
     mapping(uint256 => OrderMeta) private orderMeta;
+    mapping(address => uint256[]) public buyerOrders;
+    mapping(address => uint256[]) public merchantOrders;
 
     constructor(address _productNFT) Ownable(msg.sender) {
         productNFT = IProductNFT(_productNFT);
@@ -46,6 +48,10 @@ contract OrderManager is Ownable, IOrderManager {
             deliveryPointHash: deliveryPointHash
         });
 
+        // Map orders to buyer and merchant
+        buyerOrders[buyer].push(orderId);
+        merchantOrders[merchant].push(orderId);
+
         return orderId;
     }
 
@@ -71,5 +77,21 @@ contract OrderManager is Ownable, IOrderManager {
 
     function getOrderMeta(uint256 orderId) external view returns (OrderMeta memory) {
         return orderMeta[orderId];
+    }
+
+    function getBuyerOrderCount(address buyer) external view returns (uint256) {
+        return buyerOrders[buyer].length;
+    }
+
+    function getMerchantOrderCount(address merchant) external view returns (uint256) {
+        return merchantOrders[merchant].length;
+    }
+
+    function getBuyerOrderIds(address buyer) external view returns (uint256[] memory) {
+        return buyerOrders[buyer];
+    }
+
+    function getMerchantOrderIds(address merchant) external view returns (uint256[] memory) {
+        return merchantOrders[merchant];
     }
 }

@@ -94,7 +94,7 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
 
         // Auto-release for virtual or no delivery point
         if (
-            product.productType == keccak256("virtual") ||
+            product.productType == keccak256(abi.encodePacked("virtual")) ||
             deliveryPointHash == bytes32(0)
         ) {
             _releaseFunds(orderId);
@@ -109,7 +109,7 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
         require(msg.sender == t.merchant, "Not merchant");
 
         IProductNFT.Product memory product = productNFT.getProduct(t.tokenId);
-        require(product.productType == keccak256("physical"), "Not physical");
+        require(product.productType == keccak256(abi.encodePacked("physical")), "Not physical");
 
         orderManager.updateStatus(orderId, status);
         t.deliveryStatus = status;
@@ -124,7 +124,7 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
         require(msg.sender == t.buyer, "Not buyer");
 
         IProductNFT.Product memory product = productNFT.getProduct(t.tokenId);
-        require(product.productType == keccak256("physical"), "Not physical");
+        require(product.productType == keccak256(abi.encodePacked("physical")), "Not physical");
         require(t.deliveryStatus == IOrderManager.DeliveryStatus.InTransit, "Not in transit");
 
         orderManager.confirmDelivered(orderId);
@@ -142,7 +142,7 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
         require(msg.sender == t.buyer, "Not buyer");
 
         IProductNFT.Product memory product = productNFT.getProduct(t.tokenId);
-        require(product.productType == keccak256("virtual"), "Use confirmDelivery");
+        require(product.productType == keccak256(abi.encodePacked("virtual")), "Use confirmDelivery");
 
         _releaseFunds(orderId);
     }
