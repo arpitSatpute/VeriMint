@@ -1,13 +1,13 @@
 import { motion } from "framer-motion"
 import { useState, useEffect, type ChangeEvent, type FormEvent, type ComponentType, type InputHTMLAttributes } from "react"
-import { ShoppingCart, Hash, Layers, MapPin, CheckCircle, AlertCircle, Package } from "lucide-react"
+import { ShoppingCart, Hash, Layers, MapPin, AlertCircle, Package, X } from "lucide-react"
 import DefaultLayout from "@/layouts/default";
-import { useParams } from "react-router-dom";
-import { readContract, writeContract, waitForTransactionReceipt } from "wagmi/actions";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { writeContract, waitForTransactionReceipt } from "wagmi/actions";
 import { config } from "@/config/config";
-import PRODUCT_NFT_ABI from "@/abis/productNft.json";
-import escrowMultiProductAbi from "@/abis/escrowMultiProduct.json"; // ✅ Add import
-import { parseEther, formatEther } from "viem"; // ✅ Add formatEther
+import escrowMultiProductAbi from "@/abis/escrowMultiProduct.json";
+import { parseEther } from "viem";
+import { useAccount } from "wagmi";
 
 type ElegantShapeProps = {
   className?: string;
@@ -82,21 +82,14 @@ function FormInput({ label, icon: Icon, required, error, ...props }: FormInputPr
   )
 }
 
-interface NFTMetadata {
-  name: string;
-  description: string;
-  image: string;
-  attributes?: Array<{ trait_type: string; value: string | number }>;
-}
-
 interface NFTDataType {
   tokenId: string
   name: string
   price: string
   type: string
-  availableSupply: string
   image: string
   description: string
+  merchant: string
 }
 
 interface FormDataType {
@@ -113,12 +106,14 @@ interface ErrorsType {
   [key: string]: string
 }
 
-export default function CreateOrderForm() {
+export default function CreateOrder() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { address } = useAccount();
   const [nftData, setNftData] = useState<NFTDataType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_MULTI_PRODUCT_ADDRESS as `0x${string}`;
-  const ESCROW_MULTI_PRODUCT = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`; // ✅ Add this
+  const [submitting, setSubmitting] = useState(false);
+  const ESCROW_MULTI_PRODUCT = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`;
 
   const [formData, setFormData] = useState<FormDataType>({
     tokenId: id || '',
@@ -133,91 +128,31 @@ export default function CreateOrderForm() {
   const [errors, setErrors] = useState<ErrorsType>({})
 
   useEffect(() => {
-    if (id) {
-      loadNFTDetails(id);
-    }
-  }, [id]);
-
-  const loadNFTDetails = async (tokenId: string) => {
-    setLoading(true);
-    try {
-      console.log("🔍 Loading NFT details for order creation");
-
-      // Get token URI
-      const uri = (await readContract(config, {
-        address: MULTI_PRODUCT_ADDRESS,
-        abi: PRODUCT_NFT_ABI,
-        functionName: "uri",
-        args: [BigInt(tokenId)],
-      })) as string;
-
-      // Get product details from contract
-      const product = (await readContract(config, {
-        address: MULTI_PRODUCT_ADDRESS,
-        abi: PRODUCT_NFT_ABI,
-        functionName: "mintedProduct",
-        args: [BigInt(tokenId)],
-      })) as any;
-
-      console.log("📊 Raw product data from contract:", {
-        price: product.price?.toString(),
-        priceType: typeof product.price,
-        productType: product.productType
-      });
-
-      // Normalize IPFS URI
-      let metadataUrl = uri;
-      if (uri.startsWith("ipfs://")) {
-        metadataUrl = uri.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
-      } else if (!uri.startsWith("http")) {
-        metadataUrl = `https://gateway.pinata.cloud/ipfs/${uri}`;
-      }
-
-      // Fetch JSON metadata
-      const response = await fetch(metadataUrl);
-      if (!response.ok) throw new Error("Failed to fetch metadata");
-      const metadata: NFTMetadata = await response.json();
-
-      // Normalize image URL
-      let imageUrl = metadata.image || "";
-      if (imageUrl.startsWith("ipfs://")) {
-        imageUrl = imageUrl.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
-      }
-
-      // Extract attributes
-      const priceAttr = metadata.attributes?.find((a) => a.trait_type === "Price (ETH)");
-      const typeAttr = metadata.attributes?.find((a) => a.trait_type === "Type");
-      const supplyAttr = metadata.attributes?.find((a) => a.trait_type === "Total Supply");
-
-      // ✅ Check if contract price is in Wei and convert it
-      let priceInEth: string;
-      if (product.price && product.price > 1000000000000000n) { // If price seems to be in Wei (> 0.001 ETH in Wei)
-        priceInEth = formatEther(product.price);
-        console.log("💰 Price was in Wei, converted to ETH:", priceInEth);
-      } else {
-        priceInEth = priceAttr?.value?.toString() || product.price?.toString() || "0";
-        console.log("💰 Price from metadata:", priceInEth);
-      }
-
-      console.log("✅ Final price to use:", priceInEth + " ETH");
-
+    // Get product data passed from ProductDetails page
+    const productData = (location.state as any)?.productData;
+    
+    if (productData) {
+      console.log("✅ Received product data:", productData);
       setNftData({
-        tokenId,
-        name: metadata.name || `Token #${tokenId}`,
-        description: metadata.description || "No description available",
-        image: imageUrl,
-        price: priceInEth,
-        availableSupply: supplyAttr?.value?.toString() || "0",
-        type: typeAttr?.value?.toString() || product.productType || "virtual",
+        tokenId: productData.tokenId,
+        name: productData.name,
+        description: productData.description,
+        image: productData.image,
+        price: productData.price,
+        type: productData.type,
+        merchant: productData.merchant,
       });
-
-      console.log("✅ NFT details loaded for order");
-    } catch (error) {
-      console.error("❌ Failed to load NFT details:", error);
-    } finally {
-      setLoading(false);
+      
+      setFormData(prev => ({
+        ...prev,
+        tokenId: productData.tokenId,
+      }));
+    } else {
+      console.warn("⚠️ No product data passed");
+      alert("Product data not found. Redirecting to marketplace...");
+      navigate('/product');
     }
-  };
+  }, [id, location.state, navigate]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.currentTarget
@@ -225,7 +160,7 @@ export default function CreateOrderForm() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }))
-    // Clear error when user starts typing
+    
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -242,12 +177,7 @@ export default function CreateOrderForm() {
       newErrors.quantity = 'Quantity must be at least 1'
     }
 
-    const availableSupply = parseInt(nftData?.availableSupply || '0', 10);
-    if (quantity > availableSupply) {
-      newErrors.quantity = `Only ${availableSupply} available`
-    }
-
-    // Only validate shipping if physical product AND shipping checkbox is checked
+    // Validate shipping address only if physical product AND shipping checkbox is checked
     if (nftData?.type === 'physical' && formData.needsShipping) {
       if (!formData.addressLine1.trim()) {
         newErrors.addressLine1 = 'Street address is required'
@@ -270,89 +200,118 @@ export default function CreateOrderForm() {
   const handleSubmit = async(e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
-    if (validateForm()) {
-      try {
-        console.log("🚀 Starting order creation...");
-        
-        const quantity = parseInt(formData.quantity, 10);
-        const unitPrice = parseFloat(nftData?.price || '0');
-        const totalPriceEth = (unitPrice * quantity).toFixed(18);
-        const totalWei = parseEther(totalPriceEth);
-        
-        // Shipping address
-        let shippingAddress = "";
-        if (nftData?.type === 'physical' && formData.needsShipping) {
-          shippingAddress = [
-            formData.addressLine1,
-            formData.addressLine2,
-            formData.addressLine3,
-            formData.addressLine4
-          ].filter(line => line.trim()).join(", ");
-        }
-        
-        console.log("📦 Order details:", {
-          tokenId: nftData?.tokenId,
-          quantity,
-          shippingAddress: shippingAddress || "No shipping",
-          totalPrice: totalPriceEth + " ETH",
-        });
+    if (!address) {
+      alert('Please connect your wallet first');
+      return;
+    }
 
-        // ✅ Try with manual gas limit first
-        const tx = await writeContract(config, {
-          address: ESCROW_MULTI_PRODUCT,
-          abi: escrowMultiProductAbi,
-          functionName: "fundEscrow",
-          args: [
-            BigInt(nftData?.tokenId || '0'),
-            BigInt(quantity),
-            shippingAddress || ""
-          ],
-          value: totalWei,
-          gas: 1000000n, // Try 1M gas
-        });
+    if (!validateForm()) {
+      return;
+    }
+
+    if (submitting) return;
+    
+    try {
+      setSubmitting(true);
+      console.log("🚀 Starting order creation...");
+      
+      const quantity = parseInt(formData.quantity, 10);
+      const unitPrice = parseFloat(nftData?.price || '0');
+      const totalPriceEth = (unitPrice * quantity).toFixed(18);
+      const totalWei = parseEther(totalPriceEth);
+      
+      // Build delivery point hash (address for physical products with shipping)
+      let deliveryPointHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      
+      if (nftData?.type === 'physical' && formData.needsShipping) {
+        // Concatenate address lines for delivery point
+        const shippingAddress = [
+          formData.addressLine1,
+          formData.addressLine2,
+          formData.addressLine3,
+          formData.addressLine4
+        ].filter(line => line.trim()).join(", ");
         
-        console.log("⏳ Transaction sent:", tx);
-        alert(`Transaction submitted!\nHash: ${tx}\n\nWaiting for confirmation...`);
+        // Create a simple hash by encoding the string
+        const encoder = new TextEncoder();
+        const data = encoder.encode(shippingAddress);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        deliveryPointHash = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         
-        const receipt = await waitForTransactionReceipt(config, { 
-          hash: tx,
-          confirmations: 1,
-          timeout: 60_000, // 60 seconds
-        });
-        
-        if (receipt.status === "success") {
-          console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
-          alert(`✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalPriceEth} ETH\nGas used: ${receipt.gasUsed.toString()}`);
-        } else {
-          alert('❌ Transaction failed - check contract logs');
-        }
-        
-      } catch (err: any) {
-        console.error("❌ Order creation failed:", err);
-        
-        // Better error handling
-        if (err?.message?.includes("user rejected") || err?.message?.includes("User denied")) {
-          alert("❌ Transaction cancelled");
-        } else if (err?.message?.includes("insufficient funds")) {
-          alert("❌ Insufficient funds in wallet");
-        } else if (err?.message?.includes("out of memory") || err?.message?.includes("out of gas")) {
-          alert("❌ Contract Error: Out of gas\n\nThis is a smart contract issue - the fundEscrow function is using too much gas. Please contact the contract owner to fix this.");
-        } else if (err?.shortMessage) {
-          alert(`❌ Transaction failed:\n${err.shortMessage}`);
-        } else {
-          alert(`❌ Failed to create order:\n${err?.message?.substring(0, 150) || 'Unknown error'}`);
-        }
+        console.log("📦 Shipping address:", shippingAddress);
+        console.log("🔐 Delivery point hash:", deliveryPointHash);
       }
+      
+      console.log("📊 Order details:", {
+        tokenId: nftData?.tokenId,
+        quantity,
+        deliveryPointHash,
+        totalPrice: totalPriceEth + " ETH",
+        totalWei: totalWei.toString(),
+      });
+
+      // Call fundEscrow function
+      const tx = await writeContract(config, {
+        address: ESCROW_MULTI_PRODUCT,
+        abi: escrowMultiProductAbi,
+        functionName: "fundEscrow",
+        args: [
+          BigInt(nftData?.tokenId || '0'),
+          BigInt(quantity),
+          deliveryPointHash as `0x${string}`
+        ],
+        value: totalWei,
+        gas: 500000n, // Set reasonable gas limit to avoid "tx gas limit too high" error
+      });
+      
+      console.log("⏳ Transaction sent:", tx);
+      alert(`Transaction submitted!\n\nHash: ${tx}\n\nWaiting for confirmation...`);
+      
+      const receipt = await waitForTransactionReceipt(config, { 
+        hash: tx,
+        confirmations: 1,
+        timeout: 120_000, // 2 minutes
+      });
+      
+      if (receipt.status === "success") {
+        console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
+        alert(`✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalPriceEth} ETH\nGas used: ${receipt.gasUsed.toString()}\n\nRedirecting to orders page...`);
+        
+        // Redirect to orders page after successful purchase
+        setTimeout(() => {
+          navigate('/order');
+        }, 2000);
+      } else {
+        alert('❌ Transaction failed - check contract logs');
+      }
+      
+    } catch (err: any) {
+      console.error("❌ Order creation failed:", err);
+      
+      // Better error handling
+      if (err?.message?.includes("user rejected") || err?.message?.includes("User denied")) {
+        alert("❌ Transaction cancelled by user");
+      } else if (err?.message?.includes("insufficient funds")) {
+        alert("❌ Insufficient funds in wallet");
+      } else if (err?.shortMessage) {
+        alert(`❌ Transaction failed:\n${err.shortMessage}`);
+      } else {
+        alert(`❌ Failed to create order:\n${err?.message?.substring(0, 150) || 'Unknown error'}`);
+      }
+    } finally {
+      setSubmitting(false);
+      navigate('/product');
     }
   }
 
   const handleCancel = () => {
     if (confirm('Are you sure you want to cancel this order?')) {
-      window.history.back()
+      navigate(-1); // Go back to previous page
     }
   }
 
-  if (loading) {
+  if (!nftData) {
     return (
       <DefaultLayout>
         <div className="min-h-screen flex items-center justify-center bg-[#030303]">
@@ -362,18 +321,7 @@ export default function CreateOrderForm() {
     );
   }
 
-  if (!nftData) {
-    return (
-      <DefaultLayout>
-        <div className="min-h-screen flex items-center justify-center bg-[#030303]">
-          <p className="text-white/60">Product not found</p>
-        </div>
-      </DefaultLayout>
-    );
-  }
-
-  // ✅ Update totalPrice calculation for display
-  const totalPrice = (parseFloat(nftData.price) * (parseInt(formData.quantity, 10) || 0)).toString()
+  const totalPrice = (parseFloat(nftData.price) * (parseInt(formData.quantity, 10) || 0)).toFixed(4)
 
   return (
     <DefaultLayout>
@@ -473,10 +421,6 @@ export default function CreateOrderForm() {
                       {nftData.price} ETH
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-white/50">Available</span>
-                    <span className="text-sm text-white/70">{nftData.availableSupply}</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -515,7 +459,6 @@ export default function CreateOrderForm() {
                     onChange={handleInputChange}
                     type="number"
                     min="1"
-                    max={nftData.availableSupply}
                     placeholder="Enter quantity"
                     required
                     error={errors.quantity}
@@ -547,7 +490,7 @@ export default function CreateOrderForm() {
                       </label>
                     </div>
 
-                    {/* Shipping Address Fields - Only show if checkbox is checked */}
+                    {/* Shipping Address Fields */}
                     {formData.needsShipping && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
@@ -646,18 +589,29 @@ export default function CreateOrderForm() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleCancel}
-                    className="flex-1 px-6 py-3 rounded-xl bg-white/[0.02] border border-white/[0.08] text-white/70 font-medium hover:border-white/[0.15] hover:text-white/90 transition-all"
+                    disabled={submitting}
+                    className="flex-1 px-6 py-3 rounded-xl bg-white/[0.02] border border-white/[0.08] text-white/70 font-medium hover:border-white/[0.15] hover:text-white/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Cancel
                   </motion.button>
                   <motion.button
                     type="submit"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-rose-500/20 border-2 border-white/[0.15] text-white font-semibold hover:from-indigo-500/30 hover:to-rose-500/30 transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2"
+                    whileHover={{ scale: submitting ? 1 : 1.02 }}
+                    whileTap={{ scale: submitting ? 1 : 0.98 }}
+                    disabled={submitting}
+                    className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-rose-500/20 border-2 border-white/[0.15] text-white font-semibold hover:from-indigo-500/30 hover:to-rose-500/30 transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ShoppingCart className="w-5 h-5" />
-                    Place Order
+                    {submitting ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="w-5 h-5" />
+                        Place Order
+                      </>
+                    )}
                   </motion.button>
                 </div>
               </form>

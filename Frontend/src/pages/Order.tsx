@@ -1,8 +1,13 @@
 import { motion } from "framer-motion"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Search, Package, ShoppingBag, Clock, CheckCircle, XCircle, Truck } from "lucide-react"
 import DefaultLayout from "@/layouts/default"
-
+import { useAccount } from "wagmi"
+import { readContract } from "wagmi/actions"
+import { config } from "@/config/config"
+import ORDER_MANAGER_ABI from "@/abis/orderManager.json"
+import ESCROW_ABI from "@/abis/escrowMultiProduct.json"
+import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 
 type ElegantShapeProps = {
   className?: string
@@ -12,7 +17,6 @@ type ElegantShapeProps = {
   rotate?: number
   gradient?: string
 }
-
 
 function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }: ElegantShapeProps) {
   return (
@@ -43,6 +47,9 @@ function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate 
   )
 }
 
+type DeliveryStatus = 'Pending' | 'InTransit' | 'Delivered' | 'Failed'
+type OrderState = 'Created' | 'Released' | 'Cancelled'
+
 interface OrderType {
   id: number
   tokenId: string
@@ -54,6 +61,9 @@ interface OrderType {
   date: string
   image: string
   buyerAddress: string
+  merchantAddress: string
+  deliveryStatus: DeliveryStatus
+  orderState: OrderState
 }
 
 type OrderCardProps = {
@@ -89,12 +99,12 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-white/[0.08]">
             <img
-              src={order.image}
+              src={order.image || "/placeholder.png"}
               alt={order.name}
               className="w-full h-full object-cover"
             />
             <div className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
-              order.type === 'Physical' ? 'bg-rose-400' : 'bg-indigo-400'
+              order.type === 'physical' ? 'bg-rose-400' : 'bg-indigo-400'
             }`} />
           </div>
 
@@ -103,8 +113,8 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
               <h3 className="text-base font-semibold text-white/90 truncate">
                 {order.name}
               </h3>
-              <span className={`px-2 py-0.5 rounded-md text-xs font-medium shrink-0 ${
-                order.type === 'Physical' 
+              <span className={`px-2 py-0.5 rounded-md text-xs font-medium shrink-0 capitalize ${
+                order.type === 'physical' 
                   ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' 
                   : 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20'
               }`}>
@@ -114,7 +124,7 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
             <div className="flex items-center gap-3 text-sm text-white/50">
               <span className="font-mono">#{order.tokenId}</span>
               <span>•</span>
-              <span>Supply: {order.supply}</span>
+              <span>Qty: {order.supply}</span>
             </div>
           </div>
         </div>
@@ -157,85 +167,194 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
 }
 
 export default function Order() {
-  const [viewMode, setViewMode] = useState('buyer')
+  const { address } = useAccount()
+  const [viewMode, setViewMode] = useState<'buyer' | 'merchant'>('buyer')
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [orders, setOrders] = useState<OrderType[]>([])
+  const [loading, setLoading] = useState(false)
 
-  const orders: OrderType[] = [
-    {
-      id: 1,
-      tokenId: "1001",
-      name: "Cosmic Dreams #1",
-      price: "2.5",
-      type: "Virtual",
-      status: "completed",
-      supply: "10/100",
-      date: "Nov 5, 2025",
-      image: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=100&h=100&fit=crop",
-      buyerAddress: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-    },
-    {
-      id: 2,
-      tokenId: "1002",
-      name: "Abstract Reality",
-      price: "1.8",
-      type: "Physical",
-      status: "processing",
-      supply: "5/50",
-      date: "Nov 6, 2025",
-      image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&h=100&fit=crop",
-      buyerAddress: "0x8f3CF7ad21CaB27C891e93eE74b14E4D32fF1c67"
-    },
-    {
-      id: 3,
-      tokenId: "1003",
-      name: "Digital Essence",
-      price: "3.2",
-      type: "Virtual",
-      status: "pending",
-      supply: "15/200",
-      date: "Nov 7, 2025",
-      image: "https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=100&h=100&fit=crop",
-      buyerAddress: "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE"
-    },
-    {
-      id: 4,
-      tokenId: "1004",
-      name: "Neon Genesis",
-      price: "4.1",
-      type: "Virtual",
-      status: "shipped",
-      supply: "8/75",
-      date: "Nov 4, 2025",
-      image: "https://images.unsplash.com/photo-1635322966219-b75ed372eb01?w=100&h=100&fit=crop",
-      buyerAddress: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984"
-    },
-    {
-      id: 5,
-      tokenId: "1005",
-      name: "Ethereal Sculpture",
-      price: "5.5",
-      type: "Physical",
-      status: "processing",
-      supply: "3/25",
-      date: "Nov 7, 2025",
-      image: "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=100&h=100&fit=crop",
-      buyerAddress: "0x6B175474E89094C44Da98b954EedeAC495271d0F"
-    },
-    {
-      id: 6,
-      tokenId: "1006",
-      name: "Pixel Paradise",
-      price: "2.9",
-      type: "Virtual",
-      status: "cancelled",
-      supply: "12/150",
-      date: "Nov 3, 2025",
-      image: "https://images.unsplash.com/photo-1620121692029-d088224ddc74?w=100&h=100&fit=crop",
-      buyerAddress: "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+  const ORDER_MANAGER_ADDRESS = import.meta.env.VITE_ORDER_MANAGER_ADDRESS as `0x${string}`
+  const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`
+  const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`
+
+  useEffect(() => {
+    if (address) {
+      loadOrders()
     }
-  ]
+  }, [address, viewMode])
+
+  const mapDeliveryStatusToDisplay = (deliveryStatus: number): 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled' => {
+    // DeliveryStatus enum: Pending=0, InTransit=1, Delivered=2, Failed=3
+    switch (deliveryStatus) {
+      case 0: return 'pending'
+      case 1: return 'processing'
+      case 2: return 'completed'
+      case 3: return 'cancelled'
+      default: return 'pending'
+    }
+  }
+
+  const mapOrderStateToDisplay = (orderState: number, deliveryStatus: number): 'pending' | 'processing' | 'shipped' | 'completed' | 'cancelled' => {
+    // OrderState enum: Created=0, Released=1, Cancelled=2
+    if (orderState === 2) return 'cancelled'
+    if (orderState === 1) return 'completed'
+    return mapDeliveryStatusToDisplay(deliveryStatus)
+  }
+
+  const loadOrders = async () => {
+    if (!address) return
+    setLoading(true)
+
+    try {
+      console.log("🔍 Loading orders for address:", address)
+      
+      // Get nextOrderId to know how many orders exist
+      const nextOrderId = await readContract(config, {
+        address: ORDER_MANAGER_ADDRESS,
+        abi: ORDER_MANAGER_ABI,
+        functionName: "nextOrderId",
+      }) as bigint
+
+      const totalOrders = Number(nextOrderId)
+      console.log("📦 Total orders in system:", totalOrders)
+
+      if (totalOrders === 0) {
+        setOrders([])
+        setLoading(false)
+        return
+      }
+
+      // Fetch all orders and filter by user
+      const orderPromises: Promise<OrderType | null>[] = []
+
+      for (let i = 0; i < totalOrders; i++) {
+        orderPromises.push(
+          (async () => {
+            try {
+              // Get order data from OrderManager
+              const orderData = await readContract(config, {
+                address: ORDER_MANAGER_ADDRESS,
+                abi: ORDER_MANAGER_ABI,
+                functionName: "getOrder",
+                args: [BigInt(i)],
+              }) as any
+
+              const orderMetaData = await readContract(config, {
+                address: ORDER_MANAGER_ADDRESS,
+                abi: ORDER_MANAGER_ABI,
+                functionName: "getOrderMeta",
+                args: [BigInt(i)],
+              }) as any
+
+              // Filter based on view mode
+              const isBuyerOrder = orderData.buyer.toLowerCase() === address.toLowerCase()
+              const isMerchantOrder = orderData.merchant.toLowerCase() === address.toLowerCase()
+
+              if ((viewMode === 'buyer' && !isBuyerOrder) || (viewMode === 'merchant' && !isMerchantOrder)) {
+                return null
+              }
+
+              // Get escrow details for additional info
+              const escrowDetails = await readContract(config, {
+                address: ESCROW_ADDRESS,
+                abi: ESCROW_ABI,
+                functionName: "getOrderDetails",
+                args: [BigInt(i)],
+              }) as any
+
+              // Get product details
+              const productData = await readContract(config, {
+                address: PRODUCT_NFT_ADDRESS,
+                abi: PRODUCT_NFT_ABI,
+                functionName: "getProduct",
+                args: [orderData.tokenId],
+              }) as any
+
+              // Get product metadata for image
+              let imageUrl = "/placeholder.png"
+              let productName = productData.name || `Token #${orderData.tokenId}`
+
+              try {
+                const uri = await readContract(config, {
+                  address: PRODUCT_NFT_ADDRESS,
+                  abi: PRODUCT_NFT_ABI,
+                  functionName: "uri",
+                  args: [orderData.tokenId],
+                }) as string
+
+                if (uri) {
+                  let cid = uri.startsWith("ipfs://") ? uri.replace("ipfs://", "") : uri
+                  const metadataUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${cid}`
+                  
+                  const response = await fetch(metadataUrl, { signal: AbortSignal.timeout(5000) })
+                  if (response.ok) {
+                    const metadata = await response.json()
+                    if (metadata.image) {
+                      const imageCid = metadata.image.startsWith("ipfs://") 
+                        ? metadata.image.replace("ipfs://", "") 
+                        : metadata.image
+                      imageUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`
+                    }
+                    productName = metadata.name || productName
+                  }
+                }
+              } catch (err) {
+                console.warn(`Failed to load image for order ${i}`)
+              }
+
+              // Determine product type
+              const productTypeBytes = orderMetaData.productType || productData.productType
+              const isPhysical = productTypeBytes.toLowerCase().includes("physical")
+
+              // Format date
+              const createdTimestamp = Number(orderData.createdAt)
+              const date = new Date(createdTimestamp * 1000).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
+              })
+
+              // Map status
+              const deliveryStatusNum = Number(orderData.deliveryStatus)
+              const orderStateNum = Number(orderData.state)
+              const displayStatus = mapOrderStateToDisplay(orderStateNum, deliveryStatusNum)
+
+              return {
+                id: i + 1,
+                tokenId: orderData.tokenId.toString(),
+                name: productName,
+                price: (Number(orderMetaData.totalPrice) / 1e18).toFixed(4),
+                type: isPhysical ? 'physical' : 'virtual',
+                status: displayStatus,
+                supply: orderMetaData.supply.toString(),
+                date,
+                image: imageUrl,
+                buyerAddress: orderData.buyer,
+                merchantAddress: orderData.merchant,
+                deliveryStatus: ['Pending', 'InTransit', 'Delivered', 'Failed'][deliveryStatusNum] as DeliveryStatus,
+                orderState: ['Created', 'Released', 'Cancelled'][orderStateNum] as OrderState,
+              }
+            } catch (err) {
+              console.error(`Failed to load order ${i}:`, err)
+              return null
+            }
+          })()
+        )
+      }
+
+      const resolvedOrders = await Promise.all(orderPromises)
+      const validOrders = resolvedOrders.filter((o): o is OrderType => o !== null)
+      
+      console.log("✅ Loaded orders:", validOrders.length)
+      setOrders(validOrders)
+    } catch (error) {
+      console.error("❌ Failed to load orders:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredOrders = orders.filter(order => {
     const matchesType = filterType === 'all' || order.type.toLowerCase() === filterType
@@ -250,6 +369,18 @@ export default function Order() {
     pending: orders.filter(o => o.status === 'pending').length,
     processing: orders.filter(o => o.status === 'processing').length,
     completed: orders.filter(o => o.status === 'completed').length,
+  }
+
+  if (!address) {
+    return (
+      <DefaultLayout>
+        <div className="min-h-screen flex items-center justify-center bg-[#030303]">
+          <div className="text-center">
+            <p className="text-white/60 mb-4">Please connect your wallet to view orders</p>
+          </div>
+        </div>
+      </DefaultLayout>
+    )
   }
 
   return (
@@ -272,7 +403,7 @@ export default function Order() {
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6">
             <img src="https://kokonutui.com/logo.svg" alt="Logo" width={20} height={20} className="w-5 h-5" />
-            <span className="text-sm text-white/60 tracking-wide">21st.dev</span>
+            <span className="text-sm text-white/60 tracking-wide">VeriMint</span>
           </div>
           
           <h1 className="text-3xl md:text-5xl font-bold mb-3">
@@ -382,22 +513,31 @@ export default function Order() {
             ))}
           </div>
 
-          <div className="space-y-3">
-            {filteredOrders.length === 0 ? (
-              <div className="text-center py-12 text-white/40">
-                No orders found matching your filters
-              </div>
-            ) : (
-              filteredOrders.map((order, index) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  index={index}
-                  isMerchant={viewMode === 'merchant'}
-                />
-              ))
-            )}
-          </div>
+          {loading ? (
+            <div className="text-center py-12 text-white/40">
+              Loading orders from blockchain...
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredOrders.length === 0 ? (
+                <div className="text-center py-12 text-white/40">
+                  {orders.length === 0 
+                    ? "No orders found. Start by purchasing a product!"
+                    : "No orders found matching your filters"
+                  }
+                </div>
+              ) : (
+                filteredOrders.map((order, index) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    index={index}
+                    isMerchant={viewMode === 'merchant'}
+                  />
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 

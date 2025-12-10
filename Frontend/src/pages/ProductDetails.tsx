@@ -1,7 +1,7 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
-import { useParams, useLocation } from "react-router-dom"
-import { ShoppingCart, Heart, Share2, ExternalLink, Clock, Package, Hash, Layers, Tag, Sparkles, Calendar, CheckCircle, TrendingUp, User, Eye } from "lucide-react"
+import { useParams, useLocation, useNavigate } from "react-router-dom"
+import { ShoppingCart, Heart, Share2, Package, Hash, Tag, User } from "lucide-react"
 import DefaultLayout from "@/layouts/default"
 
 type ElegantShapeProps = {
@@ -63,13 +63,6 @@ function DetailRow({ icon: Icon, label, value, highlight }: DetailRowProps) {
   )
 }
 
-interface NFTMetadata {
-  name: string;
-  description: string;
-  image: string;
-  attributes?: Array<{ trait_type: string; value: string | number }>;
-}
-
 interface NFTDetails {
   id: number;
   name: string;
@@ -85,16 +78,15 @@ interface NFTDetails {
 export default function ProductDetails() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'properties' | 'activity'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'properties'>('details');
   const [nft, setNft] = useState<NFTDetails | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  // Log component mount and get passed data
   useEffect(() => {
     window.scroll(0, 0);
 
-    // Check if data was passed from Product page
+    // Get passed data from Product page
     const productData = (location.state as any)?.productData;
     
     if (productData) {
@@ -103,13 +95,30 @@ export default function ProductDetails() {
       console.warn("⚠️ No product data passed from Product page");
     }
 
-    setLoading(false);
-
     return () => {};
   }, [id, location.state]);
 
   const handleBuyNow = () => {
-    alert('Redirecting to purchase page...')
+    if (!nft) {
+      alert('Product data not available');
+      return;
+    }
+
+    // Navigate to create order page with all necessary data
+    navigate(`/createOrder/${nft.tokenId}`, {
+      state: {
+        productData: {
+          tokenId: nft.tokenId,
+          name: nft.name,
+          description: nft.description,
+          image: nft.image,
+          price: nft.price,
+          type: nft.type,
+          merchant: nft.merchant,
+          attributes: nft.attributes,
+        }
+      }
+    });
   }
 
   const handleShare = () => {
@@ -252,7 +261,7 @@ export default function ProductDetails() {
               </div>
             </div>
 
-            {/* Merchant - UPDATED */}
+            {/* Merchant */}
             <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4">
               <div className="flex items-center gap-2 text-xs text-white/40 mb-2">
                 <User className="w-3 h-3" />
@@ -305,7 +314,7 @@ export default function ProductDetails() {
                       <div className="space-y-1">
                         <DetailRow icon={Package} label="Token Standard" value="ERC-1155" highlight={false} />
                         <DetailRow icon={Tag} label="Blockchain" value="Ethereum" highlight={false} />
-                        <DetailRow icon={TrendingUp} label="Type" value={nft.type.toUpperCase()} highlight={true} />
+                        <DetailRow icon={Package} label="Type" value={nft.type.toUpperCase()} highlight={true} />
                       </div>
                     </div>
                   </div>
