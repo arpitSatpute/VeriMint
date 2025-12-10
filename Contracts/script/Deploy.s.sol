@@ -38,6 +38,9 @@ contract Deploy is Script {
         productNFT.setEscrow(address(escrow));
         console2.log("Escrow address set in ProductNFT");
 
+        orderManager.setEscrow(address(escrow));
+        console2.log("Escrow address set in OrderManager");
+
         // Optional: Let Escrow control OrderManager (if you want auto-updates)
         // orderManager.transferOwnership(address(escrow));
         // console2.log("OrderManager ownership transferred to Escrow");

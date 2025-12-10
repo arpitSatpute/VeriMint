@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract OrderManager is Ownable, IOrderManager {
     IProductNFT public productNFT;
+    address public escrow;
     uint256 public nextOrderId;
 
     mapping(uint256 => Order) private orders;
@@ -18,6 +19,16 @@ contract OrderManager is Ownable, IOrderManager {
         productNFT = IProductNFT(_productNFT);
     }
 
+    modifier onlyEscrow() {
+        require(msg.sender == escrow, "Only escrow");
+        _;
+    }
+
+    function setEscrow(address _escrow) external onlyOwner {
+        require(_escrow != address(0), "Invalid escrow");
+        escrow = _escrow;
+    }
+
     function createOrder(
         uint256 tokenId,
         address buyer,
@@ -26,8 +37,7 @@ contract OrderManager is Ownable, IOrderManager {
         bytes32 productType,
         bytes32 deliveryPointHash,
         address merchant
-    ) external returns (uint256) {
-        require(msg.sender == productNFT.escrowAddress(), "Only escrow");
+    ) external onlyEscrow returns (uint256) {
 
         uint256 orderId = nextOrderId++;
 
@@ -55,19 +65,19 @@ contract OrderManager is Ownable, IOrderManager {
         return orderId;
     }
 
-    function updateStatus(uint256 orderId, DeliveryStatus status) external onlyOwner {
+    function updateStatus(uint256 orderId, DeliveryStatus status) external onlyEscrow {
         orders[orderId].deliveryStatus = status;
     }
 
-    function confirmDelivered(uint256 orderId) external onlyOwner {
+    function confirmDelivered(uint256 orderId) external onlyEscrow {
         orders[orderId].deliveryStatus = DeliveryStatus.Delivered;
     }
 
-    function markReleased(uint256 orderId) external onlyOwner {
+    function markReleased(uint256 orderId) external onlyEscrow {
         orders[orderId].state = OrderState.Released;
     }
 
-    function markCancelled(uint256 orderId) external onlyOwner {
+    function markCancelled(uint256 orderId) external onlyEscrow {
         orders[orderId].state = OrderState.Cancelled;
     }
 

@@ -15,8 +15,6 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
     mapping(uint256 => Product) public products;
     mapping(uint256 => Listing) public listings;
     mapping(address => uint256[]) public merchantProducts;
-    
-
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
@@ -70,6 +68,18 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
         removeListedProduct(tokenId);
     }
 
+    // ✅ NEW: Auto-unlist function (called by escrow when supply exhausted)
+    function autoUnlist(uint256 tokenId) external {
+        require(msg.sender == escrowAddress, "Only escrow");
+        
+        // Check if actually exhausted
+        uint256 available = availableSupply(tokenId);
+        require(available == 0, "Still has supply");
+
+        delete listings[tokenId];
+        removeListedProduct(tokenId);
+    }
+
     function removeListedProduct(uint256 tokenId) internal {
         uint256 len = listedProducts.length;
         for (uint256 i = 0; i < len; i++) {
@@ -113,7 +123,6 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
         return (tokenIds, productData);
     }
 
-
     function adjustReserved(uint256 tokenId, uint256 supply, bool increase) external {
         require(msg.sender == escrowAddress, "Only escrow");
 
@@ -124,7 +133,7 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
         }
     }
 
-    function availableSupply(uint256 tokenId) external view returns (uint256) {
+    function availableSupply(uint256 tokenId) public view returns (uint256) {
         Product memory p = products[tokenId];
         return balanceOf(p.merchant, tokenId) - reservedSupply[tokenId];
     }

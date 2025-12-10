@@ -29,6 +29,9 @@ interface IProductNFT {
 
     function listProduct(uint256 tokenId) external;
     function unlistProduct(uint256 tokenId) external;
+    
+    // ✅ NEW: Auto-unlist function
+    function autoUnlist(uint256 tokenId) external;
 
     function getProduct(uint256 tokenId) external view returns (Product memory);
     function getListedProduct(uint256 tokenId) external view returns (address merchant, uint256 price);
@@ -49,5 +52,4 @@ interface IProductNFT {
     ) external;
 
     function getAllListedProducts() external view returns (uint256[] memory tokenIds, Product[] memory productData);
-
 }

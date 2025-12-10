@@ -58,8 +58,15 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
         uint256 totalPrice = pricePerUnit * supply;
         require(msg.value == totalPrice, "Wrong amount");
 
+        // ✅ Check available supply before creating order
+        uint256 available = productNFT.availableSupply(tokenId);
+        require(available >= supply, "Insufficient supply");
+
         IProductNFT.Product memory product = productNFT.getProduct(tokenId);
         require(product.merchant == merchant, "Merchant mismatch");
+
+        // ✅ Reserve supply BEFORE creating order
+        productNFT.adjustReserved(tokenId, supply, true);
 
         uint256 orderId = orderManager.createOrder(
             tokenId,
@@ -84,17 +91,25 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
             deliveryConfirmedAt: 0
         });
 
-        productNFT.adjustReserved(tokenId, supply, true);
-
         amountHeld += totalPrice;
         merchantAmount[merchant] += totalPrice;
         isFunded[orderId] = true;
 
         emit EscrowFunded(orderId, tokenId, msg.sender, merchant, totalPrice, supply);
 
-        // Check if delivery hash is "null" (no shipping needed) and auto-release
+        // ✅ Check if supply is exhausted and auto-delist
+        uint256 newAvailable = productNFT.availableSupply(tokenId);
+        if (newAvailable == 0) {
+            productNFT.autoUnlist(tokenId);
+        }
+
+        // ✅ Auto-release for virtual products OR if deliveryPointHash is keccak256("null")
         bytes32 nullHash = keccak256(abi.encodePacked("null"));
-        if (deliveryPointHash == nullHash) {
+        
+        if (
+            product.productType == keccak256(abi.encodePacked("virtual")) ||
+            deliveryPointHash == nullHash
+        ) {
             _releaseFunds(orderId);
         }
 
@@ -157,8 +172,10 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
         merchantAmount[t.merchant] -= amount;
         amountHeld -= amount;
 
+        // ✅ Release reserved supply on refund
         productNFT.adjustReserved(t.tokenId, t.supply, false);
 
+        // ✅ ONLY refund ETH (merchant keeps/returns NFTs separately)
         (bool sent, ) = payable(t.buyer).call{value: amount}("");
         require(sent, "Refund failed");
 
@@ -173,14 +190,13 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
         require(!isReleased[orderId], "Already released");
         require(isFunded[orderId], "Not funded");
 
-        productNFT.releaseFromMerchant(t.merchant, t.buyer, t.tokenId, t.supply, "");
-
         orderManager.markReleased(orderId);
 
         uint256 amount = t.totalPrice;
         merchantAmount[t.merchant] -= amount;
         amountHeld -= amount;
 
+        // ✅ ONLY handle ETH transfer (merchant handles NFT transfer separately)
         (bool sent, ) = payable(t.merchant).call{value: amount}("");
         require(sent, "Transfer failed");
 
