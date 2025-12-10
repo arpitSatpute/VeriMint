@@ -1,5 +1,5 @@
 import { motion } from "framer-motion"
-import { useState, useEffect, type ChangeEvent, type FormEvent, type ComponentType, type InputHTMLAttributes } from "react"
+import { useState, useEffect, type ChangeEvent, type FormEvent } from "react"
 import { ShoppingCart, Hash, Layers, MapPin, AlertCircle, Package } from "lucide-react"
 import DefaultLayout from "@/layouts/default";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
@@ -7,80 +7,17 @@ import { writeContract, waitForTransactionReceipt, readContract } from "wagmi/ac
 import { config } from "@/config/config";
 import escrowMultiProductAbi from "@/abis/escrowMultiProduct.json";
 import productNftAbi from "@/abis/productNft.json";
-import { parseEther, keccak256, toHex, encodePacked } from "viem";
+import { keccak256, toHex, encodePacked } from "viem";
 import { useAccount } from "wagmi";
 
-type ElegantShapeProps = {
-  className?: string;
-  delay?: number;
-  width?: number;
-  height?: number;
-  rotate?: number;
-  gradient?: string;
-}
-
-function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }: ElegantShapeProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
-      animate={{ opacity: 1, y: 0, rotate: rotate }}
-      transition={{
-        duration: 2.4,
-        delay,
-        ease: [0.23, 0.86, 0.39, 0.96],
-        opacity: { duration: 1.2 },
-      }}
-      className={`absolute ${className}`}
-    >
-      <motion.div
-        animate={{ y: [0, 15, 0] }}
-        transition={{
-          duration: 12,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        style={{ width, height }}
-        className="relative"
-      >
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r to-transparent backdrop-blur-[2px] border-2 border-white/[0.15] shadow-[0_8px_32px_0_rgba(255,255,255,0.1)]" style={{ backgroundImage: `linear-gradient(to right, ${gradient.replace('from-', '')}, transparent)` }} />
-      </motion.div>
-    </motion.div>
-  )
-}
-
-interface FormInputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label: string
-  icon?: ComponentType<React.SVGProps<SVGSVGElement>>
-  required?: boolean
-  error?: string
-}
-
-function FormInput({ label, icon: Icon, required, error, ...props }: FormInputProps) {
-  return (
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 text-sm font-medium text-white/70">
-        {Icon && <Icon className="w-4 h-4" />}
-        {label}
-        {required && <span className="text-rose-400">*</span>}
-      </label>
-      <div className="relative">
-        <input
-          {...props}
-          className={`w-full px-4 py-3 bg-white/[0.02] border rounded-xl text-white/90 placeholder:text-white/30 focus:outline-none focus:ring-2 transition-all ${
-            error 
-              ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/20' 
-              : 'border-white/[0.08] focus:border-indigo-500/50 focus:ring-indigo-500/20'
-          }`}
-        />
-      </div>
-      {error && (
-        <p className="text-xs text-rose-400 flex items-center gap-1">
-          <AlertCircle className="w-3 h-3" />
-          {error}
-        </p>
-      )}
-    </div>
-  )
+interface FormDataType {
+  tokenId: string
+  quantity: string
+  needsShipping: boolean
+  addressLine1: string
+  addressLine2: string
+  addressLine3: string
+  addressLine4: string
 }
 
 interface NFTDataType {
@@ -91,16 +28,6 @@ interface NFTDataType {
   image: string
   description: string
   merchant: string
-}
-
-interface FormDataType {
-  tokenId: string
-  quantity: string
-  needsShipping: boolean
-  addressLine1: string
-  addressLine2: string
-  addressLine3: string
-  addressLine4: string
 }
 
 interface ErrorsType {
@@ -114,6 +41,8 @@ export default function CreateOrder() {
   const { address } = useAccount();
   const [nftData, setNftData] = useState<NFTDataType | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [maxSupply, setMaxSupply] = useState<number>(0);
+  
   const ESCROW_MULTI_PRODUCT = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`;
   const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
 
@@ -121,10 +50,10 @@ export default function CreateOrder() {
     tokenId: id || '',
     quantity: '1',
     needsShipping: false,
-    addressLine1: 'null',
-    addressLine2: 'null',
-    addressLine3: 'null',
-    addressLine4: 'null',
+    addressLine1: '',
+    addressLine2: '',
+    addressLine3: '',
+    addressLine4: '',
   })
 
   const [errors, setErrors] = useState<ErrorsType>({})
@@ -133,7 +62,6 @@ export default function CreateOrder() {
     const productData = (location.state as any)?.productData;
     
     if (productData) {
-      console.log("✅ Received product data:", productData);
       setNftData({
         tokenId: productData.tokenId,
         name: productData.name,
@@ -148,12 +76,31 @@ export default function CreateOrder() {
         ...prev,
         tokenId: productData.tokenId,
       }));
+
+      // ✅ FIX: Fetch available supply from contract
+      fetchAvailableSupply(productData.tokenId);
     } else {
-      console.warn("⚠️ No product data passed");
       alert("Product data not found. Redirecting to marketplace...");
       navigate('/product');
     }
   }, [id, location.state, navigate]);
+
+  const fetchAvailableSupply = async (tokenId: string) => {
+    try {
+      const available = await readContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: productNftAbi,
+        functionName: "availableSupply",
+        args: [BigInt(tokenId)],
+      }) as bigint;
+
+      setMaxSupply(Number(available));
+      console.log("✅ Available supply:", Number(available));
+    } catch (error) {
+      console.error("Failed to fetch available supply:", error);
+      setMaxSupply(0);
+    }
+  };
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.currentTarget
@@ -176,6 +123,11 @@ export default function CreateOrder() {
 
     if (quantity < 1) {
       newErrors.quantity = 'Quantity must be at least 1'
+    }
+
+    // ✅ FIX: Check against available supply
+    if (quantity > maxSupply) {
+      newErrors.quantity = `Only ${maxSupply} units available`
     }
 
     if (nftData?.type === 'physical' && formData.needsShipping) {
@@ -215,146 +167,76 @@ export default function CreateOrder() {
       setSubmitting(true);
       console.log("🚀 Starting order creation...");
       
-      // ✅ DEBUG: Check escrow address configuration
-      const escrowAddressFromContract = await readContract(config, {
-        address: PRODUCT_NFT_ADDRESS,
-        abi: productNftAbi,
-        functionName: "escrowAddress",
-      }) as string;
-      
-      console.log("🔍 Escrow address check:");
-      console.log("   Expected (from env):", ESCROW_MULTI_PRODUCT);
-      console.log("   Found in contract:", escrowAddressFromContract);
-      console.log("   Match:", escrowAddressFromContract.toLowerCase() === ESCROW_MULTI_PRODUCT.toLowerCase());
-      
       const quantity = BigInt(formData.quantity);
       
-      // Verify product is listed before calling fundEscrow
-      console.log("🔍 Checking if product is listed...");
+      const tokenIdBig = BigInt(nftData?.tokenId || '0');
+      console.log("🔍 Pre-flight checks - TokenID:", tokenIdBig.toString());
+      
+      // ✅ Verify product is still listed
       const isListed = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: productNftAbi,
         functionName: "isProductListed",
-        args: [BigInt(nftData?.tokenId || '0')],
+        args: [tokenIdBig],
       }) as boolean;
 
-      console.log("🔍 Product listed check:", isListed);
-      console.log("📋 Token ID being ordered:", nftData?.tokenId);
-      console.log("📋 Token ID as BigInt:", BigInt(nftData?.tokenId || '0').toString());
-      
+      console.log("✓ Product listed:", isListed);
       if (!isListed) {
-        throw new Error(`Product #${nftData?.tokenId} is not listed for sale. Please verify the product exists and is still listed.`);
+        throw new Error("Product is no longer listed");
       }
 
-      // Get the actual listing price (this is the price that matters!)
-      console.log("💳 Fetching listing details...");
-      let listedProduct: [string, bigint];
-      try {
-        listedProduct = await readContract(config, {
-          address: PRODUCT_NFT_ADDRESS,
-          abi: productNftAbi,
-          functionName: "getListedProduct",
-          args: [BigInt(nftData?.tokenId || '0')],
-        }) as [string, bigint];
-      } catch (getListError) {
-        console.error("❌ Error fetching listed product:", getListError);
-        throw new Error(`Failed to fetch listing for product #${nftData?.tokenId}. Product may have been delisted.`);
+      // ✅ Re-check available supply before proceeding
+      const currentAvailable = await readContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: productNftAbi,
+        functionName: "availableSupply",
+        args: [tokenIdBig],
+      }) as bigint;
+
+      console.log("✓ Available supply:", currentAvailable.toString());
+      if (currentAvailable < quantity) {
+        throw new Error(`Insufficient supply. Only ${currentAvailable} units available`);
       }
 
-      console.log("💰 Listed product price (from listing):", listedProduct[1].toString());
-      console.log("📍 Merchant address from listing:", listedProduct[0]);
+      // ✅ Get the EXACT listing price
+      const listedProduct = await readContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: productNftAbi,
+        functionName: "getListedProduct",
+        args: [tokenIdBig],
+      }) as [string, bigint];
 
-      // Use the LISTING price, not the product price (listing price is what was locked in)
-      const exactPricePerUnit = listedProduct[1]; // Price from listing, in wei
-      const totalWei = exactPricePerUnit * quantity;
+      const pricePerUnit = listedProduct[1];
+      const totalWei = pricePerUnit * quantity;
       
-      console.log("💰 Price calculation (using listing price):", {
-        pricePerUnit: exactPricePerUnit.toString(),
+      console.log("✓ Merchant:", listedProduct[0]);
+      console.log("✓ Price per unit:", pricePerUnit.toString());
+      console.log("✓ Total WEI:", totalWei.toString());
+      
+      console.log("💰 Order details:", {
+        pricePerUnit: pricePerUnit.toString(),
         quantity: quantity.toString(),
         totalWei: totalWei.toString(),
         totalEth: (Number(totalWei) / 1e18).toFixed(18)
       });
       
-      // Build delivery point hash
+      // Build delivery point hash matching contract's keccak256(abi.encodePacked("null"))
       let deliveryPointHash: `0x${string}`;
-      let addressForHash = "";
       
-      // Always collect address, either from user input or use "null"
       if (nftData?.type === 'physical' && formData.needsShipping) {
-        // User wants shipping - use their provided address
-        addressForHash = [
+        const shippingAddress = [
           formData.addressLine1,
           formData.addressLine2,
           formData.addressLine3,
           formData.addressLine4
-        ].filter(line => line.trim() && line.trim() !== 'null').join(", ");
+        ].filter(line => line.trim()).join(", ");
         
-        if (addressForHash.trim().length === 0) {
-          // User selected shipping but didn't provide address - use "null"
-          addressForHash = "null";
-        }
+        deliveryPointHash = keccak256(encodePacked(['string'], [shippingAddress]));
+        console.log("📦 Shipping Address Hash:", deliveryPointHash);
       } else {
-        // Virtual product or no shipping needed - use "null"
-        addressForHash = "null";
-      }
-      
-      // Generate hash from address
-      deliveryPointHash = keccak256(encodePacked(['string'], [addressForHash]));
-      
-      console.log("📦 Address for hash:", addressForHash);
-      console.log("🔐 Delivery point hash:", deliveryPointHash);
-      console.log("📊 Hash details:", {
-        isVirtual: nftData?.type === 'virtual',
-        needsShipping: formData.needsShipping,
-        providedAddress: addressForHash
-      });
-      
-      console.log("📊 Order details:", {
-        tokenId: nftData?.tokenId,
-        quantity: quantity.toString(),
-        deliveryPointHash,
-        totalWei: totalWei.toString(),
-        isVirtual: nftData?.type === 'virtual',
-        needsShipping: formData.needsShipping
-      });
-
-      // Verify merchant matches
-      console.log("📍 Merchant address from listing:", listedProduct[0]);
-      console.log("📍 Merchant address in product data:", nftData?.merchant);
-      console.log("📍 Merchant address matches product merchant?", listedProduct[0].toLowerCase() === (nftData?.merchant || '').toLowerCase());
-
-      if (listedProduct[0].toLowerCase() !== (nftData?.merchant || '').toLowerCase()) {
-        console.warn("⚠️ WARNING: Merchant mismatch!");
-        console.warn("   Listed product merchant:", listedProduct[0]);
-        console.warn("   Product data merchant:", nftData?.merchant);
-      }
-
-      console.log("✅ Price already calculated using listing price - no mismatch possible");
-      console.log("✅ All pre-flight checks passed. Proceeding with fundEscrow...");
-      console.log("  - Product is listed: YES");
-      console.log("  - Price from listing: YES");
-      console.log("  - Escrow contract is set: YES");
-      console.log("🚀 Sending transaction with:");
-      console.log("  - ESCROW_MULTI_PRODUCT:", ESCROW_MULTI_PRODUCT);
-      console.log("  - PRODUCT_NFT_ADDRESS:", PRODUCT_NFT_ADDRESS);
-      console.log("  - tokenId:", nftData?.tokenId);
-      console.log("  - tokenId (as BigInt):", BigInt(nftData?.tokenId || '0').toString());
-      console.log("  - quantity:", quantity.toString());
-      console.log("  - deliveryPointHash:", deliveryPointHash);
-      console.log("  - value (ETH):", (Number(totalWei) / 1e18).toFixed(6));
-      
-      // CRITICAL: Do one final check right before sending
-      console.log("⚠️  Final verification before transaction...");
-      const finalIsListed = await readContract(config, {
-        address: PRODUCT_NFT_ADDRESS,
-        abi: productNftAbi,
-        functionName: "isProductListed",
-        args: [BigInt(nftData?.tokenId || '0')],
-      }) as boolean;
-      
-      console.log("✅ Final isProductListed check:", finalIsListed);
-      if (!finalIsListed) {
-        throw new Error(`Product #${nftData?.tokenId} is no longer listed! It may have been delisted just now.`);
+        // Use null hash for virtual products or if no shipping needed
+        deliveryPointHash = keccak256(encodePacked(['string'], ['null']));
+        console.log("📦 Null Hash (No Shipping):", deliveryPointHash);
       }
 
       // Call fundEscrow function
@@ -372,7 +254,6 @@ export default function CreateOrder() {
       });
       
       console.log("⏳ Transaction sent:", tx);
-      console.log(`Transaction submitted!\n\nHash: ${tx}\n\nWaiting for confirmation...`);
       
       const receipt = await waitForTransactionReceipt(config, { 
         hash: tx,
@@ -383,21 +264,44 @@ export default function CreateOrder() {
       if (receipt.status === "success") {
         console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
         const totalEth = (Number(totalWei) / 1e18).toFixed(4);
-        alert(`✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalEth} ETH\nGas used: ${receipt.gasUsed.toString()}\n\nRedirecting to orders page...`);
+        alert(`✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalEth} ETH\nQuantity: ${quantity}\n\nRedirecting to orders page...`);
         
         setTimeout(() => {
           navigate('/order');
         }, 2000);
       } else {
-        console.log('❌ Transaction failed - check contract logs');
+        throw new Error('Transaction failed');
       }
       
     } catch (err: any) {
       console.error("❌ Order creation failed:", err);
-        
+      console.error("Full error object:", JSON.stringify(err, null, 2));
+      
+      let errorMessage = "Unknown error";
+      
+      if (err?.message) {
+        if (err.message.includes("user rejected") || err.message.includes("User denied")) {
+          errorMessage = "Transaction cancelled by user";
+        } else if (err.message.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds in wallet";
+        } else if (err.message.includes("Not listed")) {
+          errorMessage = "Product is not listed for sale";
+        } else if (err.message.includes("Insufficient supply")) {
+          errorMessage = err.message;
+        } else if (err.message.includes("Wrong amount")) {
+          errorMessage = "Price mismatch - please refresh and try again";
+        } else if (err.message.includes("execution reverted")) {
+          errorMessage = "❌ Transaction reverted. Check console for details. This usually means: Product not listed, insufficient supply, or price mismatch.";
+        } else if (err.shortMessage) {
+          errorMessage = err.shortMessage;
+        } else {
+          errorMessage = err.message.substring(0, 200);
+        }
+      }
+      
+      alert(`❌ Failed to create order:\n${errorMessage}`);
     } finally {
       setSubmitting(false);
-      navigate('/product');
     }
   }
 
@@ -422,34 +326,8 @@ export default function CreateOrder() {
   return (
     <DefaultLayout>
     <div className="relative min-h-screen w-full bg-[#030303]">
+      {/* Background elements remain same */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
-
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <ElegantShape
-          delay={0.3}
-          width={500}
-          height={120}
-          rotate={12}
-          gradient="indigo-500/[0.12]"
-          className="left-[-8%] top-[10%]"
-        />
-        <ElegantShape
-          delay={0.5}
-          width={400}
-          height={100}
-          rotate={-15}
-          gradient="rose-500/[0.12]"
-          className="right-[-5%] bottom-[15%]"
-        />
-        <ElegantShape
-          delay={0.4}
-          width={250}
-          height={70}
-          rotate={-8}
-          gradient="violet-500/[0.12]"
-          className="left-[8%] bottom-[8%]"
-        />
-      </div>
 
       <div className="relative z-10 container mx-auto px-4 md:px-6 py-8 md:py-12 max-w-4xl">
         <motion.div
@@ -458,11 +336,6 @@ export default function CreateOrder() {
           transition={{ duration: 0.8 }}
           className="mb-8"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6">
-            <img src="https://kokonutui.com/logo.svg" alt="Logo" width={20} height={20} className="w-5 h-5" />
-            <span className="text-sm text-white/60 tracking-wide">VeriMint</span>
-          </div>
-          
           <h1 className="text-3xl md:text-5xl font-bold mb-3">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-white/90 to-rose-300">
               Create Order
@@ -498,15 +371,9 @@ export default function CreateOrder() {
               </div>
               
               <div className="p-5 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-lg font-semibold text-white/90">
-                    {nftData.name}
-                  </h3>
-                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.08] shrink-0">
-                    <span className="text-xs text-white/40">#</span>
-                    <span className="text-xs text-white/60 font-mono">{nftData.tokenId}</span>
-                  </div>
-                </div>
+                <h3 className="text-lg font-semibold text-white/90">
+                  {nftData.name}
+                </h3>
 
                 <p className="text-sm text-white/50 line-clamp-2">{nftData.description}</p>
 
@@ -515,6 +382,13 @@ export default function CreateOrder() {
                     <span className="text-sm text-white/50">Unit Price</span>
                     <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-rose-300">
                       {nftData.price} ETH
+                    </span>
+                  </div>
+                  {/* ✅ Show available supply */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-white/50">Available</span>
+                    <span className="text-sm font-semibold text-emerald-300">
+                      {maxSupply} units
                     </span>
                   </div>
                 </div>
@@ -538,27 +412,39 @@ export default function CreateOrder() {
                     Order Details
                   </h3>
 
-                  <FormInput
-                    label="Token ID"
-                    icon={Hash}
-                    name="tokenId"
-                    value={formData.tokenId}
-                    disabled
-                    readOnly
-                  />
-
-                  <FormInput
-                    label="Quantity"
-                    icon={Layers}
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleInputChange}
-                    type="number"
-                    min="1"
-                    placeholder="Enter quantity"
-                    required
-                    error={errors.quantity}
-                  />
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-white/70">
+                      <Layers className="w-4 h-4" />
+                      Quantity
+                      <span className="text-rose-400">*</span>
+                      {maxSupply > 0 && (
+                        <span className="text-xs text-white/40 ml-auto">
+                          Max: {maxSupply}
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      name="quantity"
+                      value={formData.quantity}
+                      onChange={handleInputChange}
+                      type="number"
+                      min="1"
+                      max={maxSupply}
+                      placeholder="Enter quantity"
+                      required
+                      className={`w-full px-4 py-3 bg-white/[0.02] border rounded-xl text-white/90 placeholder:text-white/30 focus:outline-none focus:ring-2 transition-all ${
+                        errors.quantity 
+                          ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/20' 
+                          : 'border-white/[0.08] focus:border-indigo-500/50 focus:ring-indigo-500/20'
+                      }`}
+                    />
+                    {errors.quantity && (
+                      <p className="text-xs text-rose-400 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {errors.quantity}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Physical Product Shipping Option */}
@@ -600,68 +486,44 @@ export default function CreateOrder() {
                           Shipping Address
                         </h3>
 
-                        <FormInput
-                          label="Street Address"
-                          icon={MapPin}
+                        <input
                           name="addressLine1"
                           value={formData.addressLine1}
                           onChange={handleInputChange}
                           placeholder="Building number, street name"
-                          required
-                          error={errors.addressLine1}
+                          required={formData.needsShipping}
+                          className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-white/90 placeholder:text-white/30 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                         />
+                        {errors.addressLine1 && <p className="text-xs text-rose-400">{errors.addressLine1}</p>}
 
-                        <FormInput
-                          label="City / State"
-                          icon={MapPin}
+                        <input
                           name="addressLine2"
                           value={formData.addressLine2}
                           onChange={handleInputChange}
                           placeholder="City, State/Province"
-                          required
-                          error={errors.addressLine2}
+                          required={formData.needsShipping}
+                          className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-white/90 placeholder:text-white/30 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                         />
 
-                        <FormInput
-                          label="Postal Code"
-                          icon={MapPin}
+                        <input
                           name="addressLine3"
                           value={formData.addressLine3}
                           onChange={handleInputChange}
                           placeholder="ZIP / Postal code"
-                          required
-                          error={errors.addressLine3}
+                          required={formData.needsShipping}
+                          className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-white/90 placeholder:text-white/30 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                         />
 
-                        <FormInput
-                          label="Country"
-                          icon={MapPin}
+                        <input
                           name="addressLine4"
                           value={formData.addressLine4}
                           onChange={handleInputChange}
                           placeholder="Country"
-                          required
-                          error={errors.addressLine4}
+                          required={formData.needsShipping}
+                          className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-white/90 placeholder:text-white/30 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                         />
                       </motion.div>
                     )}
-                  </div>
-                )}
-
-                {/* Virtual Product Info */}
-                {nftData.type === 'virtual' && (
-                  <div className="space-y-4 pt-6 border-t border-white/[0.08]">
-                    <div className="flex items-center gap-3 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                      <div className="flex items-start gap-3">
-                        <Package className="w-5 h-5 text-indigo-300 shrink-0 mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="text-sm text-indigo-200 font-medium">Digital Product</p>
-                          <p className="text-xs text-indigo-300/70">
-                            This is a digital product. No shipping address is required.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -679,12 +541,6 @@ export default function CreateOrder() {
                         <span className="text-white/50">Quantity</span>
                         <span className="text-white/80">× {formData.quantity || 0}</span>
                       </div>
-                      {nftData.type === 'physical' && formData.needsShipping && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-white/50">Shipping</span>
-                          <span className="text-white/80">Included</span>
-                        </div>
-                      )}
                       <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between">
                         <span className="text-base font-semibold text-white/90">Total</span>
                         <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-rose-300">
@@ -711,7 +567,7 @@ export default function CreateOrder() {
                     type="submit"
                     whileHover={{ scale: submitting ? 1 : 1.02 }}
                     whileTap={{ scale: submitting ? 1 : 0.98 }}
-                    disabled={submitting}
+                    disabled={submitting || maxSupply === 0}
                     className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-rose-500/20 border-2 border-white/[0.15] text-white font-semibold hover:from-indigo-500/30 hover:to-rose-500/30 transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {submitting ? (
@@ -719,6 +575,8 @@ export default function CreateOrder() {
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Processing...
                       </>
+                    ) : maxSupply === 0 ? (
+                      'Out of Stock'
                     ) : (
                       <>
                         <ShoppingCart className="w-5 h-5" />
@@ -732,8 +590,6 @@ export default function CreateOrder() {
           </motion.div>
         </div>
       </div>
-
-      <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
     </div>
     </DefaultLayout>
   )
