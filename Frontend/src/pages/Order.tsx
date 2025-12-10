@@ -210,58 +210,47 @@ export default function Order() {
     try {
       console.log("🔍 Loading orders for address:", address)
       
-      // Get nextOrderId to know how many orders exist
-      const nextOrderId = await readContract(config, {
-        address: ORDER_MANAGER_ADDRESS,
-        abi: ORDER_MANAGER_ABI,
-        functionName: "nextOrderId",
-      }) as bigint
+      // Get order IDs for current user based on view mode
+      const orderIds = viewMode === 'buyer'
+        ? (await readContract(config, {
+            address: ORDER_MANAGER_ADDRESS,
+            abi: ORDER_MANAGER_ABI,
+            functionName: "getBuyerOrderIds",
+            args: [address],
+          }) as bigint[])
+        : (await readContract(config, {
+            address: ORDER_MANAGER_ADDRESS,
+            abi: ORDER_MANAGER_ABI,
+            functionName: "getMerchantOrderIds",
+            args: [address],
+          }) as bigint[])
 
-      const totalOrders = Number(nextOrderId)
-      console.log("📦 Total orders in system:", totalOrders)
+      const totalUserOrders = orderIds.length
+      console.log(`📦 Total ${viewMode} orders:`, totalUserOrders)
 
-      if (totalOrders === 0) {
+      if (totalUserOrders === 0) {
         setOrders([])
         setLoading(false)
         return
       }
 
-      // Fetch all orders and filter by user
-      const orderPromises: Promise<OrderType | null>[] = []
-
-      for (let i = 0; i < totalOrders; i++) {
-        orderPromises.push(
+      // Fetch all orders in parallel
+      const orderPromises: Promise<OrderType | null>[] = orderIds.map(
+        (orderId) =>
           (async () => {
             try {
-              // Get order data from OrderManager
               const orderData = await readContract(config, {
                 address: ORDER_MANAGER_ADDRESS,
                 abi: ORDER_MANAGER_ABI,
                 functionName: "getOrder",
-                args: [BigInt(i)],
+                args: [orderId],
               }) as any
 
               const orderMetaData = await readContract(config, {
                 address: ORDER_MANAGER_ADDRESS,
                 abi: ORDER_MANAGER_ABI,
                 functionName: "getOrderMeta",
-                args: [BigInt(i)],
-              }) as any
-
-              // Filter based on view mode
-              const isBuyerOrder = orderData.buyer.toLowerCase() === address.toLowerCase()
-              const isMerchantOrder = orderData.merchant.toLowerCase() === address.toLowerCase()
-
-              if ((viewMode === 'buyer' && !isBuyerOrder) || (viewMode === 'merchant' && !isMerchantOrder)) {
-                return null
-              }
-
-              // Get escrow details for additional info
-              const escrowDetails = await readContract(config, {
-                address: ESCROW_ADDRESS,
-                abi: ESCROW_ABI,
-                functionName: "getOrderDetails",
-                args: [BigInt(i)],
+                args: [orderId],
               }) as any
 
               // Get product details
@@ -301,7 +290,7 @@ export default function Order() {
                   }
                 }
               } catch (err) {
-                console.warn(`Failed to load image for order ${i}`)
+                console.warn(`Failed to load image for order ${orderId}`)
               }
 
               // Determine product type
@@ -322,7 +311,7 @@ export default function Order() {
               const displayStatus = mapOrderStateToDisplay(orderStateNum, deliveryStatusNum)
 
               return {
-                id: i + 1,
+                id: Number(orderId),
                 tokenId: orderData.tokenId.toString(),
                 name: productName,
                 price: (Number(orderMetaData.totalPrice) / 1e18).toFixed(4),
@@ -337,12 +326,11 @@ export default function Order() {
                 orderState: ['Created', 'Released', 'Cancelled'][orderStateNum] as OrderState,
               }
             } catch (err) {
-              console.error(`Failed to load order ${i}:`, err)
+              console.error(`Failed to load order ${orderId}:`, err)
               return null
             }
           })()
-        )
-      }
+      )
 
       const resolvedOrders = await Promise.all(orderPromises)
       const validOrders = resolvedOrders.filter((o): o is OrderType => o !== null)
@@ -350,7 +338,12 @@ export default function Order() {
       console.log("✅ Loaded orders:", validOrders.length)
       setOrders(validOrders)
     } catch (error) {
-      console.error("❌ Failed to load orders:", error)
+      console.error("❌ Failed to load orders:", error);
+      console.error("Error details:", {
+        message: (error as any)?.message,
+        code: (error as any)?.code,
+        shortMessage: (error as any)?.shortMessage,
+      });
     } finally {
       setLoading(false)
     }

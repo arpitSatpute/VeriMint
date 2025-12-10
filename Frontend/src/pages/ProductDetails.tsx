@@ -1,8 +1,9 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { useParams, useLocation, useNavigate } from "react-router-dom"
-import { ShoppingCart, Heart, Share2, Package, Hash, Tag, User } from "lucide-react"
+import { ShoppingCart, Heart, Share2, Package, Hash, Tag, User, Eye } from "lucide-react"
 import DefaultLayout from "@/layouts/default"
+import { useAccount } from "wagmi"
 
 type ElegantShapeProps = {
   className?: string;
@@ -79,24 +80,33 @@ export default function ProductDetails() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const { address } = useAccount(); // Get connected wallet address
   const [liked, setLiked] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'properties'>('details');
   const [nft, setNft] = useState<NFTDetails | null>(null);
+  const [isMerchantView, setIsMerchantView] = useState(false); // Track if merchant is viewing
 
   useEffect(() => {
     window.scroll(0, 0);
 
-    // Get passed data from Product page
+    // Get passed data from Product or Merchant page
     const productData = (location.state as any)?.productData;
+    const merchantViewFlag = (location.state as any)?.isMerchantView;
     
     if (productData) {
       setNft(productData);
+      
+      // Check if this is merchant viewing their own product
+      if (merchantViewFlag || (address && productData.merchant && 
+          address.toLowerCase() === productData.merchant.toLowerCase())) {
+        setIsMerchantView(true);
+      }
     } else {
-      console.warn("⚠️ No product data passed from Product page");
+      console.warn("⚠️ No product data passed from previous page");
     }
 
     return () => {};
-  }, [id, location.state]);
+  }, [id, location.state, address]);
 
   const handleBuyNow = () => {
     if (!nft) {
@@ -161,6 +171,14 @@ export default function ProductDetails() {
             <img src="https://kokonutui.com/logo.svg" alt="Logo" width={20} height={20} className="w-5 h-5" />
             <span className="text-sm text-white/60 tracking-wide">VeriMint</span>
           </div>
+          
+          {/* Show merchant viewing badge if applicable */}
+          {isMerchantView && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-500/10 border border-violet-500/30 mb-4">
+              <Eye className="w-4 h-4 text-violet-300" />
+              <span className="text-sm text-violet-300 font-medium">Viewing Your Product</span>
+            </div>
+          )}
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -247,17 +265,29 @@ export default function ProductDetails() {
                   <span className="text-xl text-white/50">ETH</span>
                 </div>
                 
-                <div className="flex gap-3">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleBuyNow}
-                    className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-rose-500/20 border-2 border-white/[0.15] text-white font-semibold hover:from-indigo-500/30 hover:to-rose-500/30 transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                    Buy Now
-                  </motion.button>
-                </div>
+                {/* Only show Buy Now button if NOT merchant viewing their own product */}
+                {!isMerchantView && (
+                  <div className="flex gap-3">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleBuyNow}
+                      className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500/20 to-rose-500/20 border-2 border-white/[0.15] text-white font-semibold hover:from-indigo-500/30 hover:to-rose-500/30 transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2"
+                    >
+                      <ShoppingCart className="w-5 h-5" />
+                      Buy Now
+                    </motion.button>
+                  </div>
+                )}
+                
+                {/* Show merchant info message instead of buy button */}
+                {isMerchantView && (
+                  <div className="bg-violet-500/10 border border-violet-500/30 rounded-lg p-4 text-center">
+                    <p className="text-sm text-violet-300">
+                      This is your product. Manage it from the Merchant Dashboard.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

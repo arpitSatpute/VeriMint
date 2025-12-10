@@ -1,12 +1,13 @@
 import { motion } from "framer-motion"
 import { useState, useEffect, type ChangeEvent, type FormEvent, type ComponentType, type InputHTMLAttributes } from "react"
-import { ShoppingCart, Hash, Layers, MapPin, AlertCircle, Package, X } from "lucide-react"
+import { ShoppingCart, Hash, Layers, MapPin, AlertCircle, Package } from "lucide-react"
 import DefaultLayout from "@/layouts/default";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { writeContract, waitForTransactionReceipt } from "wagmi/actions";
+import { writeContract, waitForTransactionReceipt, readContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import escrowMultiProductAbi from "@/abis/escrowMultiProduct.json";
-import { parseEther } from "viem";
+import productNftAbi from "@/abis/productNft.json";
+import { parseEther, keccak256, toHex, encodePacked } from "viem";
 import { useAccount } from "wagmi";
 
 type ElegantShapeProps = {
@@ -114,6 +115,7 @@ export default function CreateOrder() {
   const [nftData, setNftData] = useState<NFTDataType | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const ESCROW_MULTI_PRODUCT = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`;
+  const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
 
   const [formData, setFormData] = useState<FormDataType>({
     tokenId: id || '',
@@ -128,7 +130,6 @@ export default function CreateOrder() {
   const [errors, setErrors] = useState<ErrorsType>({})
 
   useEffect(() => {
-    // Get product data passed from ProductDetails page
     const productData = (location.state as any)?.productData;
     
     if (productData) {
@@ -177,7 +178,6 @@ export default function CreateOrder() {
       newErrors.quantity = 'Quantity must be at least 1'
     }
 
-    // Validate shipping address only if physical product AND shipping checkbox is checked
     if (nftData?.type === 'physical' && formData.needsShipping) {
       if (!formData.addressLine1.trim()) {
         newErrors.addressLine1 = 'Street address is required'
@@ -215,16 +215,30 @@ export default function CreateOrder() {
       setSubmitting(true);
       console.log("🚀 Starting order creation...");
       
-      const quantity = parseInt(formData.quantity, 10);
-      const unitPrice = parseFloat(nftData?.price || '0');
-      const totalPriceEth = (unitPrice * quantity).toFixed(18);
-      const totalWei = parseEther(totalPriceEth);
+      const quantity = BigInt(formData.quantity);
       
-      // Build delivery point hash (address for physical products with shipping)
-      let deliveryPointHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      // ✅ FIX: Get exact price from contract instead of using passed data
+      const productData = await readContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: productNftAbi,
+        functionName: "getProduct",
+        args: [BigInt(nftData?.tokenId || '0')],
+      }) as any;
+      
+      const exactPricePerUnit = productData.price; // This is in wei
+      const totalWei = exactPricePerUnit * quantity;
+      
+      console.log("💰 Price calculation:", {
+        pricePerUnit: exactPricePerUnit.toString(),
+        quantity: quantity.toString(),
+        totalWei: totalWei.toString(),
+        totalEth: (Number(totalWei) / 1e18).toFixed(18)
+      });
+      
+      // Build delivery point hash
+      let deliveryPointHash: `0x${string}` = "0x0000000000000000000000000000000000000000000000000000000000000000";
       
       if (nftData?.type === 'physical' && formData.needsShipping) {
-        // Concatenate address lines for delivery point
         const shippingAddress = [
           formData.addressLine1,
           formData.addressLine2,
@@ -232,12 +246,8 @@ export default function CreateOrder() {
           formData.addressLine4
         ].filter(line => line.trim()).join(", ");
         
-        // Create a simple hash by encoding the string
-        const encoder = new TextEncoder();
-        const data = encoder.encode(shippingAddress);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        deliveryPointHash = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        // ✅ FIX: Use proper keccak256 with encodePacked for consistent hashing
+        deliveryPointHash = keccak256(encodePacked(['string'], [shippingAddress]));
         
         console.log("📦 Shipping address:", shippingAddress);
         console.log("🔐 Delivery point hash:", deliveryPointHash);
@@ -245,11 +255,39 @@ export default function CreateOrder() {
       
       console.log("📊 Order details:", {
         tokenId: nftData?.tokenId,
-        quantity,
+        quantity: quantity.toString(),
         deliveryPointHash,
-        totalPrice: totalPriceEth + " ETH",
         totalWei: totalWei.toString(),
       });
+
+      // Verify product is listed before calling fundEscrow
+      const isListed = await readContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: productNftAbi,
+        functionName: "isProductListed",
+        args: [BigInt(nftData?.tokenId || '0')],
+      }) as boolean;
+
+      console.log("🔍 Product listed check:", isListed);
+      
+      if (!isListed) {
+        throw new Error("Product is not listed for sale");
+      }
+
+      // Get the actual listing price
+      const listedProduct = await readContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: productNftAbi,
+        functionName: "getListedProduct",
+        args: [BigInt(nftData?.tokenId || '0')],
+      }) as [string, bigint];
+
+      console.log("💰 Listed product price:", listedProduct[1].toString());
+      console.log("💰 Total we're sending:", totalWei.toString());
+
+      if (listedProduct[1] * quantity !== totalWei) {
+        throw new Error(`Price mismatch! Expected: ${(listedProduct[1] * quantity).toString()}, Got: ${totalWei.toString()}`);
+      }
 
       // Call fundEscrow function
       const tx = await writeContract(config, {
@@ -258,47 +296,66 @@ export default function CreateOrder() {
         functionName: "fundEscrow",
         args: [
           BigInt(nftData?.tokenId || '0'),
-          BigInt(quantity),
-          deliveryPointHash as `0x${string}`
+          quantity,
+          deliveryPointHash
         ],
         value: totalWei,
-        gas: 500000n, // Set reasonable gas limit to avoid "tx gas limit too high" error
+        gas: 1500000n,
       });
       
       console.log("⏳ Transaction sent:", tx);
-      alert(`Transaction submitted!\n\nHash: ${tx}\n\nWaiting for confirmation...`);
+      console.log(`Transaction submitted!\n\nHash: ${tx}\n\nWaiting for confirmation...`);
       
       const receipt = await waitForTransactionReceipt(config, { 
         hash: tx,
         confirmations: 1,
-        timeout: 120_000, // 2 minutes
+        timeout: 120_000,
       });
       
       if (receipt.status === "success") {
         console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
-        alert(`✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalPriceEth} ETH\nGas used: ${receipt.gasUsed.toString()}\n\nRedirecting to orders page...`);
+        const totalEth = (Number(totalWei) / 1e18).toFixed(4);
+        alert(`✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalEth} ETH\nGas used: ${receipt.gasUsed.toString()}\n\nRedirecting to orders page...`);
         
-        // Redirect to orders page after successful purchase
         setTimeout(() => {
           navigate('/order');
         }, 2000);
       } else {
-        alert('❌ Transaction failed - check contract logs');
+        console.log('❌ Transaction failed - check contract logs');
       }
       
     } catch (err: any) {
       console.error("❌ Order creation failed:", err);
       
-      // Better error handling
-      if (err?.message?.includes("user rejected") || err?.message?.includes("User denied")) {
-        alert("❌ Transaction cancelled by user");
-      } else if (err?.message?.includes("insufficient funds")) {
-        alert("❌ Insufficient funds in wallet");
-      } else if (err?.shortMessage) {
-        alert(`❌ Transaction failed:\n${err.shortMessage}`);
-      } else {
-        alert(`❌ Failed to create order:\n${err?.message?.substring(0, 150) || 'Unknown error'}`);
+      let errorMessage = "Unknown error";
+      
+      // Extract actual revert reason from error
+      if (err?.message) {
+        if (err.message.includes("user rejected") || err.message.includes("User denied")) {
+          errorMessage = "Transaction cancelled by user";
+        } else if (err.message.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds in wallet";
+        } else if (err.message.includes("Not listed")) {
+          errorMessage = "Product is not listed for sale";
+        } else if (err.message.includes("Wrong amount")) {
+          errorMessage = "Price mismatch - the ETH amount doesn't match the product price";
+        } else if (err.message.includes("Price mismatch")) {
+          errorMessage = err.message;
+        } else if (err.shortMessage) {
+          errorMessage = err.shortMessage;
+        } else {
+          errorMessage = err.message.substring(0, 200);
+        }
       }
+      
+      console.error("Detailed error:", {
+        message: err?.message,
+        shortMessage: err?.shortMessage,
+        cause: err?.cause,
+        data: err?.data,
+      });
+      
+      alert(`❌ Failed to create order:\n${errorMessage}`);
     } finally {
       setSubmitting(false);
       navigate('/product');
@@ -307,7 +364,7 @@ export default function CreateOrder() {
 
   const handleCancel = () => {
     if (confirm('Are you sure you want to cancel this order?')) {
-      navigate(-1); // Go back to previous page
+      navigate(-1);
     }
   }
 

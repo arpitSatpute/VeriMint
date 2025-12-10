@@ -8,6 +8,7 @@ import { config } from "@/config/config";
 import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { parseEther, keccak256, toBytes } from "viem";
 import { useAccount } from "wagmi"; // ✅ Add this import
+import { Navigate, useNavigate } from "react-router-dom";
 
 type ElegantShapeProps = {
   className?: string;
@@ -148,7 +149,7 @@ export default function VirtualProductMint() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
   const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
- 
+  const navigate = useNavigate();
   const [fileInfo, setFileInfo] = useState<FileInfoType | null>(null)
   const [formData, setFormData] = useState<FormDataType>({
     name: '',
@@ -359,11 +360,14 @@ export default function VirtualProductMint() {
     
     if (receipt.status === "success") {
       console.log("✅ NFT minted successfully!");
-      alert('Virtual Product NFT minted successfully!');
+      console.log('Virtual Product NFT minted successfully!');
+      navigate('/merchant');
     } else {
       console.log("❌ Transaction failed");
       alert('Transaction failed');
     }
+
+    
   }
 
 

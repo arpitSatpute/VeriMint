@@ -63,6 +63,8 @@ type MerchantNFT = {
   image: string;
   description: string;
   isListed: boolean;
+  merchant?: string;
+  attributes?: Array<{ trait_type: string; value: string | number }>;
 }
 
 type MerchantNFTCardProps = {
@@ -71,9 +73,10 @@ type MerchantNFTCardProps = {
   onBurn: (id: number) => void;
   onList: (id: number) => void;
   onUnlist: (id: number) => void;
+  onViewDetails: (nft: MerchantNFT) => void;
 }
 
-function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCardProps) {
+function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist, onViewDetails }: MerchantNFTCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [showActions, setShowActions] = useState(false)
 
@@ -93,7 +96,8 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
       }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
-      className="group relative"
+      onClick={() => onViewDetails(nft)}
+      className="group relative cursor-pointer"
     >
       <div className="relative bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl overflow-hidden transition-all duration-500 hover:border-white/[0.15] hover:bg-white/[0.04]">
         <div className="relative aspect-square overflow-hidden">
@@ -168,7 +172,10 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setShowActions(!showActions)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowActions(!showActions)
+              }}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500/10 to-rose-500/10 border border-white/[0.08] text-white/80 font-medium hover:border-white/[0.15] hover:bg-gradient-to-r hover:from-indigo-500/20 hover:to-rose-500/20 transition-all duration-300"
             >
               Manage NFT
@@ -182,10 +189,14 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                   className="absolute bottom-full left-0 right-0 mb-2 bg-[#0a0a0a] border border-white/[0.15] rounded-xl p-2 shadow-2xl z-10"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <motion.button
                     whileHover={{ scale: 1.02, x: 4 }}
-                    onClick={() => onBurn(nft.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onBurn(nft.id);
+                    }}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-rose-300 hover:bg-rose-500/10 transition-all text-sm"
                   >
                     <Flame className="w-4 h-4" />
@@ -195,7 +206,10 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
                   {nft.isListed ? (
                     <motion.button
                       whileHover={{ scale: 1.02, x: 4 }}
-                      onClick={() => onUnlist(nft.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onUnlist(nft.id);
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-amber-300 hover:bg-amber-500/10 transition-all text-sm"
                     >
                       <XCircle className="w-4 h-4" />
@@ -204,7 +218,10 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist }: MerchantNFTCa
                   ) : (
                     <motion.button
                       whileHover={{ scale: 1.02, x: 4 }}
-                      onClick={() => onList(nft.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onList(nft.id);
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-emerald-300 hover:bg-emerald-500/10 transition-all text-sm"
                     >
                       <ShoppingCart className="w-4 h-4" />
@@ -230,6 +247,24 @@ function Merchant() {
   const navigate = useNavigate();
 
   const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
+
+  const handleViewDetails = (nft: MerchantNFT) => {
+    navigate(`/productDetails/${nft.tokenId}`, {
+      state: {
+        productData: {
+          tokenId: nft.tokenId,
+          name: nft.name,
+          description: nft.description,
+          image: nft.image,
+          price: nft.price,
+          type: nft.type,
+          merchant: nft.merchant || address,
+          attributes: nft.attributes,
+        },
+        isMerchantView: true,
+      }
+    });
+  };
 
   useEffect(() => {
     if (!address) return;
@@ -473,6 +508,7 @@ function Merchant() {
               supply: balance.toString(),
               type,
               isListed,
+              merchant: product.merchant,
               attributes: metadata.attributes,
             };
           } catch (err) {
@@ -717,6 +753,7 @@ function Merchant() {
                     onBurn={handleBurn}
                     onList={handleList}
                     onUnlist={handleUnlist}
+                    onViewDetails={handleViewDetails}
                   />
                 ))
               )}

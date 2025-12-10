@@ -8,6 +8,7 @@ import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { parseEther, keccak256, toBytes } from "viem";
 import DefaultLayout from "@/layouts/default";
 import { useAccount } from "wagmi";
+import { useNavigate } from "react-router-dom";
 
 
 type ElegantShapeProps = {
@@ -154,6 +155,8 @@ export default function PhysicalProductMint() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
   const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS;
+  const navigate = useNavigate();
+  
 
   const [formData, setFormData] = useState<FormDataType>({
     identityNumber: '',
@@ -348,6 +351,9 @@ export default function PhysicalProductMint() {
     } catch (error) {
       console.error('Minting error:', error);
       alert('Failed to mint product. Please try again.');
+    }
+    finally{
+      navigate('/merchant');
     }
   }
 
