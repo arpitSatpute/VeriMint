@@ -250,7 +250,6 @@ export default function Order() {
     setLoading(true)
 
     try {
-      console.log("🔍 Loading orders for address:", address)
       
       // Step 1: Get order IDs based on view mode
       const orderIds = viewMode === 'buyer'
@@ -267,7 +266,6 @@ export default function Order() {
             args: [address],
           }) as bigint[])
 
-      console.log(`📦 Found ${orderIds.length} ${viewMode} orders`)
 
       if (orderIds.length === 0) {
         setOrders([])
@@ -315,7 +313,6 @@ export default function Order() {
             uri = product.tokenURI
           }
 
-          console.log(`📄 Order ${orderId}: URI = ${uri}`)
 
           // Step 4: Extract CID and fetch metadata from IPFS
           let metadata: any = {
@@ -350,7 +347,6 @@ export default function Order() {
 
                 if (response.ok) {
                   metadata = await response.json()
-                  console.log(`✅ Order ${orderId}: Fetched metadata from ${gatewayUrl}`)
                   break
                 }
               } catch (err) {
@@ -443,7 +439,6 @@ export default function Order() {
       const resolvedOrders = await Promise.all(orderPromises)
       const validOrders = resolvedOrders.filter((o): o is OrderType => o !== null)
       
-      console.log("✅ Loaded orders:", validOrders.length)
       setOrders(validOrders)
     } catch (error) {
       console.error("❌ Failed to load orders:", error)
