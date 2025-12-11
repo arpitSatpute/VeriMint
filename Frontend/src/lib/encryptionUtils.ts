@@ -1,6 +1,6 @@
 // src/lib/encryptionUtils.ts
 import * as LitJsSdk from "@lit-protocol/lit-node-client";
-import { keccak256, encodePacked } from "viem";
+import { keccak256, encodePacked, getAddress } from "viem";
 import { Buffer } from "buffer";
 
 const client = new LitJsSdk.LitNodeClient({
@@ -99,50 +99,60 @@ export const encryptDeliveryAddress = async (
 
 /**
  * Decrypt delivery address (only merchant can decrypt if conditions met on-chain)
+ * Note: encryptedHexString should be the 0x-prefixed hex from contract
  */
 export const decryptDeliveryAddress = async (
-  encryptedString: string,
+  encryptedHexString: string,
   dataToEncryptHash: string,
   merchantAddress: string,
-  authSig: any // Wallet signature for authentication
+  authSig: any
 ): Promise<string> => {
   try {
     await initializeLitClient();
 
+    console.log("🔐 Decrypting with Lit Protocol...");
+    console.log("   Input ciphertext type:", typeof encryptedHexString);
+    console.log("   Input ciphertext length:", encryptedHexString.length);
+
+    // Convert hex string to base64 (Lit Protocol expects base64 string)
+    const hexString = encryptedHexString.startsWith('0x') 
+      ? encryptedHexString.slice(2) 
+      : encryptedHexString;
+    
+    // Convert hex to Buffer then to base64
+    const buffer = Buffer.from(hexString, 'hex');
+    const ciphertextBase64 = buffer.toString('base64');
+
+    console.log("   Converted to base64 length:", ciphertextBase64.length);
+    console.log("   Base64 sample:", ciphertextBase64.slice(0, 50));
+
+    // Get access control conditions
     const accessControlConditions = getAccessControlConditions(merchantAddress);
 
-    // Lit Protocol v3 expects ciphertext as a STRING (base64), not Uint8Array
-    
-    console.log("🔐 Decrypting with Lit Protocol v3...");
-    console.log("   AccessControlConditions:", accessControlConditions.length, "conditions");
-    console.log("   AuthSig address:", authSig?.address);
-    console.log("   DataToEncryptHash:", dataToEncryptHash?.slice(0, 20) || "empty");
-    
     // Build decrypt parameters
     const decryptParams: any = {
       accessControlConditions,
-      ciphertext: encryptedString, // Pass as string (base64 encoded)
-      authSig, // Full authSig object with sig, derivedVia, signedMessage, address
+      ciphertext: ciphertextBase64, // Pass as base64 STRING
+      authSig,
       chain: "sepolia",
     };
-    
-    // Only add dataToEncryptHash if it's provided and not empty
+
+    // Only add dataToEncryptHash if provided
     if (dataToEncryptHash && dataToEncryptHash.trim().length > 0) {
       decryptParams.dataToEncryptHash = dataToEncryptHash;
       console.log("   Using provided dataToEncryptHash");
-    } else {
-      console.log("   No dataToEncryptHash provided, Lit SDK will derive it");
     }
-    
-    // Decrypt the address using Lit Protocol v3 API
+
+    console.log("   Calling Lit decrypt with base64 ciphertext...");
+
+    // Decrypt the address
     const decryptedData = await client.decrypt(decryptParams);
 
-    // decryptedData is the decrypted content, convert to string
+    // Convert decrypted data to string
     const decryptedString = new TextDecoder().decode(
       new Uint8Array(decryptedData as unknown as ArrayBuffer)
     );
     console.log("✅ Address decrypted successfully");
-    return decryptedString;
     return decryptedString;
   } catch (error: any) {
     console.error("❌ Decryption failed:", error);
@@ -162,34 +172,67 @@ export const decryptDeliveryAddress = async (
 };
 
 /**
- * Get authentication signature from wallet using Lit Protocol's wallet-agnostic method
- * Works with all EIP-1193 wallets (MetaMask, Phantom, Backpack, etc.)
- * 
- * This creates a SIWE (Sign In With Ethereum) message and signs it,
- * which Lit Protocol uses for access control verification
+ * Get authentication signature from wallet using Lit Protocol's method
+ * Compatible with Lit Protocol v6+ BLS signature requirements
  */
 export const getAuthSignature = async (): Promise<any> => {
   try {
-    console.log("🔑 Getting Lit auth signature using wallet-agnostic method...");
+    console.log("🔑 Getting Lit auth signature...");
 
-    // Use Lit's wallet-agnostic method which works with all EIP-1193 providers
-    // This automatically detects the connected wallet from window.ethereum
-    const nonce = await client.getLatestBlockhash();
-    const authSig = await LitJsSdk.checkAndSignAuthMessage({
-      chain: "sepolia",
-      nonce: nonce,
-    });
+    // Check if ethereum provider is available
+    if (typeof window === 'undefined' || !window.ethereum) {
+      throw new Error("No wallet found. Please install MetaMask or another Web3 wallet.");
+    }
 
-    console.log("✅ Auth signature obtained via Lit Protocol (wallet-agnostic)");
-    console.log("   Sig length:", authSig.sig?.length || 0);
-    console.log("   Derived via:", authSig.derivedVia);
+    // Get the connected account
+    const accounts = await window.ethereum.request({ 
+      method: 'eth_requestAccounts' 
+    }) as string[];
     
+    if (!accounts || accounts.length === 0) {
+      throw new Error("No accounts found. Please connect your wallet.");
+    }
+
+    // Checksum the address to EIP-55 format (required by SIWE)
+    const address = getAddress(accounts[0]);
+
+    // Get latest blockhash for nonce
+    const latestBlockhash = await client.getLatestBlockhash();
+    
+    // Create SIWE message
+    const domain = window.location.host;
+    const origin = window.location.origin;
+    const statement = "Sign this message to decrypt the delivery address with Lit Protocol.";
+    
+    // Construct SIWE message manually for better control
+    const expirationTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const issuedAt = new Date().toISOString();
+    
+    const message = `${domain} wants you to sign in with your Ethereum account:\n${address}\n\n${statement}\n\nURI: ${origin}\nVersion: 1\nChain ID: 11155111\nNonce: ${latestBlockhash}\nIssued At: ${issuedAt}\nExpiration Time: ${expirationTime}`;
+
+    console.log("📝 SIWE message:", message);
+
+    // Request signature from wallet
+    const signature = await window.ethereum.request({
+      method: 'personal_sign',
+      params: [message, address],
+    }) as string;
+
+    console.log("✅ Signature obtained");
+    console.log("   Address:", address);
+    console.log("   Signature length:", signature.length);
+
+    // Construct authSig object in the format Lit Protocol expects
+    const authSig = {
+      sig: signature,
+      derivedVia: "web3.eth.personal.sign",
+      signedMessage: message,
+      address: address,
+    };
+
     return authSig;
   } catch (error) {
     console.error("❌ Failed to get auth signature:", error);
-    if ((error as any)?.message?.includes("No injected provider")) {
-      throw new Error("No wallet found. Please install MetaMask, Phantom, Backpack, or another Web3 wallet.");
-    }
     throw error;
   }
 };
@@ -272,12 +315,13 @@ export const formatEncryptedDataForContract = (encryptedData: {
 };
 
 /**
- * Parse encrypted data from contract
+ * Parse encrypted data from contract - converts hex to base64
+ * Lit Protocol's decrypt() function expects base64 string for ciphertext
  */
 export const parseEncryptedDataFromContract = (
   encryptedBytes: `0x${string}`
 ): string => {
-  // Convert hex bytes back to base64 string
+  // Convert hex bytes to base64 string for Lit Protocol
   const hexString = encryptedBytes.slice(2); // Remove '0x'
   const buffer = Buffer.from(hexString, "hex");
   return buffer.toString("base64");

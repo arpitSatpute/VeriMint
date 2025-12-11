@@ -227,17 +227,18 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
 
       const [encryptedAddressHex, addressCommitment, dataToEncryptHash] = encryptedData;
 
-      // Convert hex bytes to base64 string for Lit Protocol
-      const encryptedString = parseEncryptedDataFromContract(encryptedAddressHex as `0x${string}`);
+      // Convert hex to base64 for Lit Protocol decryption
+      const ciphertextBase64 = parseEncryptedDataFromContract(encryptedAddressHex as `0x${string}`);
+      console.log("   Ciphertext prepared (base64)");
 
-      // Step 3: Get authentication signature from wallet (wallet-agnostic, works with all wallets)
+      // Step 3: Get authentication signature from wallet
       console.log("🔑 Getting authentication signature...");
       const authSig = await getAuthSignature();
 
       // Step 4: Decrypt using Lit Protocol
       console.log("🔓 Decrypting address with Lit Protocol...");
       const decrypted = await decryptDeliveryAddress(
-        encryptedString,
+        encryptedAddressHex as string, // Pass hex directly, decrypt function will convert to base64
         dataToEncryptHash,
         address, // merchantAddress
         authSig
