@@ -1,6 +1,6 @@
 import { motion } from "framer-motion"
 import { useState, useEffect, type ChangeEvent, type FormEvent } from "react"
-import { ShoppingCart, Hash, Layers, MapPin, AlertCircle, Package } from "lucide-react"
+import { ShoppingCart, Hash, Layers, MapPin, AlertCircle, Package, Lock } from "lucide-react"
 import DefaultLayout from "@/layouts/default";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { writeContract, waitForTransactionReceipt, readContract } from "wagmi/actions";
@@ -9,6 +9,12 @@ import escrowMultiProductAbi from "@/abis/escrowMultiProduct.json";
 import productNftAbi from "@/abis/productNft.json";
 import { keccak256, toHex, encodePacked } from "viem";
 import { useAccount } from "wagmi";
+import {
+  encryptDeliveryAddress,
+  generateDeliveryHash,
+  formatEncryptedDataForContract,
+  isEncryptionSupported,
+} from "@/lib/encryptionUtils";
 
 interface FormDataType {
   tokenId: string
@@ -42,6 +48,8 @@ export default function CreateOrder() {
   const [nftData, setNftData] = useState<NFTDataType | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [maxSupply, setMaxSupply] = useState<number>(0);
+  const [useEncryption, setUseEncryption] = useState(true);
+  const [encryptionSupported, setEncryptionSupported] = useState(false);
   
   const ESCROW_MULTI_PRODUCT = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`;
   const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
@@ -77,12 +85,14 @@ export default function CreateOrder() {
         tokenId: productData.tokenId,
       }));
 
-      // ✅ FIX: Fetch available supply from contract
       fetchAvailableSupply(productData.tokenId);
     } else {
       alert("Product data not found. Redirecting to marketplace...");
       navigate('/product');
     }
+
+    // Check if encryption is supported
+    setEncryptionSupported(isEncryptionSupported());
   }, [id, location.state, navigate]);
 
   const fetchAvailableSupply = async (tokenId: string) => {
@@ -125,7 +135,6 @@ export default function CreateOrder() {
       newErrors.quantity = 'Quantity must be at least 1'
     }
 
-    // ✅ FIX: Check against available supply
     if (quantity > maxSupply) {
       newErrors.quantity = `Only ${maxSupply} units available`
     }
@@ -172,7 +181,7 @@ export default function CreateOrder() {
       const tokenIdBig = BigInt(nftData?.tokenId || '0');
       console.log("🔍 Pre-flight checks - TokenID:", tokenIdBig.toString());
       
-      // ✅ Verify product is still listed
+      // Verify product is still listed
       const isListed = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: productNftAbi,
@@ -185,7 +194,7 @@ export default function CreateOrder() {
         throw new Error("Product is no longer listed");
       }
 
-      // ✅ Re-check available supply before proceeding
+      // Re-check available supply before proceeding
       const currentAvailable = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: productNftAbi,
@@ -198,7 +207,7 @@ export default function CreateOrder() {
         throw new Error(`Insufficient supply. Only ${currentAvailable} units available`);
       }
 
-      // ✅ Get the EXACT listing price
+      // Get the EXACT listing price
       const listedProduct = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: productNftAbi,
@@ -220,37 +229,78 @@ export default function CreateOrder() {
         totalEth: (Number(totalWei) / 1e18).toFixed(18)
       });
       
-      // Build delivery point hash matching contract's keccak256(abi.encodePacked("null"))
+      // Build delivery data
+      let deliveryAddress = "";
       let deliveryPointHash: `0x${string}`;
+      let encryptedAddress: `0x${string}` = "0x";
+      let addressCommitment: `0x${string}` = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      let dataToEncryptHash = "";
       
       if (nftData?.type === 'physical' && formData.needsShipping) {
-        const shippingAddress = [
+        deliveryAddress = [
           formData.addressLine1,
           formData.addressLine2,
           formData.addressLine3,
           formData.addressLine4
         ].filter(line => line.trim()).join(", ");
         
-        deliveryPointHash = keccak256(encodePacked(['string'], [shippingAddress]));
+        // Generate hash for backward compatibility
+        deliveryPointHash = generateDeliveryHash(deliveryAddress);
         console.log("📦 Shipping Address Hash:", deliveryPointHash);
+
+        // ✅ NEW: Encrypt address if supported and enabled
+        if (useEncryption && encryptionSupported && deliveryAddress) {
+          try {
+            console.log("🔐 Encrypting delivery address...");
+
+            const encryptedData = await encryptDeliveryAddress(
+              deliveryAddress,
+              listedProduct[0] // merchant address
+            );
+
+            const formatted = formatEncryptedDataForContract(encryptedData);
+            encryptedAddress = formatted.encryptedAddress;
+            addressCommitment = formatted.addressCommitment;
+            dataToEncryptHash = formatted.dataToEncryptHash;
+
+            console.log("✅ Address encrypted successfully");
+            console.log("🔑 Encrypted Address Length:", encryptedAddress.length);
+            console.log("🔑 Commitment:", addressCommitment);
+          } catch (encryptError: any) {
+            console.error("⚠️ Encryption failed, falling back to hash only:", encryptError);
+            alert(`⚠️ Encryption failed: ${encryptError?.message || "Unknown error"}\n\nContinuing with unencrypted order...`);
+            // Continue with just hash if encryption fails
+          }
+        }
       } else {
         // Use null hash for virtual products or if no shipping needed
-        deliveryPointHash = keccak256(encodePacked(['string'], ['null']));
+        deliveryPointHash = generateDeliveryHash("null");
         console.log("📦 Null Hash (No Shipping):", deliveryPointHash);
       }
+
+      // Check if contract supports encryption (has 6 parameters)
+      const supportsEncryption = encryptedAddress !== "0x";
 
       // Call fundEscrow function
       const tx = await writeContract(config, {
         address: ESCROW_MULTI_PRODUCT,
         abi: escrowMultiProductAbi,
         functionName: "fundEscrow",
-        args: [
-          BigInt(nftData?.tokenId || '0'),
+        args: supportsEncryption ? [
+          tokenIdBig,
+          quantity,
+          deliveryPointHash,
+          encryptedAddress,
+          addressCommitment,
+          dataToEncryptHash,
+          true // hasEncryptedData
+        ] : [
+          tokenIdBig,
           quantity,
           deliveryPointHash
         ],
         value: totalWei,
-        gas: 1500000n,
+        gas: supportsEncryption ? 2000000n : 1500000n, // Increased gas for encryption storage
       });
       
       console.log("⏳ Transaction sent:", tx);
@@ -264,7 +314,14 @@ export default function CreateOrder() {
       if (receipt.status === "success") {
         console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
         const totalEth = (Number(totalWei) / 1e18).toFixed(4);
-        alert(`✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalEth} ETH\nQuantity: ${quantity}\n\nRedirecting to orders page...`);
+        
+        let successMessage = `✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalEth} ETH\nQuantity: ${quantity}`;
+        
+        if (supportsEncryption) {
+          successMessage += "\n\n🔐 Delivery address encrypted with Lit Protocol\n✓ Merchant can only decrypt after order is funded";
+        }
+        
+        alert(successMessage + "\n\nRedirecting to orders page...");
         
         setTimeout(() => {
           navigate('/order');
@@ -326,7 +383,6 @@ export default function CreateOrder() {
   return (
     <DefaultLayout>
     <div className="relative min-h-screen w-full bg-[#030303]">
-      {/* Background elements remain same */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
       <div className="relative z-10 container mx-auto px-4 md:px-6 py-8 md:py-12 max-w-4xl">
@@ -384,7 +440,6 @@ export default function CreateOrder() {
                       {nftData.price} ETH
                     </span>
                   </div>
-                  {/* ✅ Show available supply */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-white/50">Available</span>
                     <span className="text-sm font-semibold text-emerald-300">
@@ -450,6 +505,32 @@ export default function CreateOrder() {
                 {/* Physical Product Shipping Option */}
                 {nftData.type === 'physical' && (
                   <div className="space-y-4 pt-6 border-t border-white/[0.08]">
+                    {/* ✅ NEW: Encryption Toggle */}
+                    {encryptionSupported && (
+                      <div className="flex items-center gap-3 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                        <input
+                          type="checkbox"
+                          id="useEncryption"
+                          checked={useEncryption}
+                          onChange={(e) => setUseEncryption(e.target.checked)}
+                          className="w-5 h-5 rounded border-indigo-500/30 bg-white/[0.02] text-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                        <label htmlFor="useEncryption" className="flex-1 cursor-pointer">
+                          <div className="flex items-start gap-3">
+                            <Lock className="w-5 h-5 text-indigo-300 shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                              <p className="text-sm text-indigo-200 font-medium">
+                                Enable Address Encryption (Recommended)
+                              </p>
+                              <p className="text-xs text-indigo-300/70">
+                                Your delivery address will be encrypted with Lit Protocol. Only the merchant can decrypt it after order is funded.
+                              </p>
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-3 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                       <input
                         type="checkbox"
@@ -522,6 +603,16 @@ export default function CreateOrder() {
                           required={formData.needsShipping}
                           className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-white/90 placeholder:text-white/30 focus:border-indigo-500/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                         />
+
+                        {/* ✅ NEW: Encryption status indicator */}
+                        {useEncryption && encryptionSupported && (
+                          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 flex items-center gap-2">
+                            <Lock className="w-4 h-4 text-green-400" />
+                            <span className="text-xs text-green-300">
+                              ✓ Address will be encrypted before storage
+                            </span>
+                          </div>
+                        )}
                       </motion.div>
                     )}
                   </div>

@@ -14,6 +14,7 @@ import CreateOrderForm from "./forms/CreateOrder";
 import ProductDetails from "./pages/ProductDetails";
 import Merchant from "./pages/Merchant";
 import DeliveryPage from "./pages/Delivery";
+import DecryptPage from "./pages/DecryptPage";
 
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ function App() {
             <Route element={<CreateOrderForm />} path="/createOrder/:id" />
             <Route element={<ProductDetails />} path="/productDetails/:id" />
             <Route element={<DeliveryPage />} path="/delivery/:orderId" />
+            <Route element={<DecryptPage />} path="/decrypt/:orderId" />
           </Routes>
         </QueryClientProvider>
       </ThirdwebProvider>

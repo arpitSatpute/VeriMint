@@ -158,6 +158,20 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
             </div>
           )}
 
+          {showAddress && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/decrypt/${order.orderId}`)
+              }}
+              className="px-4 py-2 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-500/30 hover:border-indigo-500/50 transition-all shrink-0"
+            >
+              🔓 Show Address
+            </motion.button>
+          )}
+
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
