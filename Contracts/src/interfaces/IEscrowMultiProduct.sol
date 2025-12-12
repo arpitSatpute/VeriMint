@@ -72,5 +72,7 @@ interface IEscrowMultiProduct {
     function confirmDelivery(uint256 orderId) external;
     function releaseFundToMerchant(uint256 orderId) external;
     function refundToBuyer(uint256 orderId) external;
+
+    function claimRefundAfterDeadline(uint256 orderId) external;
     function getOrderDetails(uint256 orderId) external view returns (TraceNft memory);
 }

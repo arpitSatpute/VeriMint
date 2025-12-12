@@ -12,15 +12,14 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
 
     uint256 public amountHeld;
 
-    // ✅ NEW: Enhanced delivery data structure
     struct EncryptedDeliveryData {
-        bytes encryptedAddress;           // Lit Protocol encrypted address
-        bytes32 addressCommitment;        // ZK proof commitment for verification
-        string dataToEncryptHash;         // Lit SDK hash required for decryption
-        uint256 decryptionDeadline;       // Time limit for decryption (7 days default)
-        bool merchantDecrypted;           // Track if merchant accessed address
-        uint256 merchantDecryptedAt;      // Timestamp of decryption
-        bool isEncrypted;                 // Flag to check if using encryption
+        bytes encryptedAddress;           
+        bytes32 addressCommitment;        
+        string dataToEncryptHash;         
+        uint256 decryptionDeadline;      
+        bool merchantDecrypted;          
+        uint256 merchantDecryptedAt;     
+        bool isEncrypted;                
     }
 
     struct TraceNft {
@@ -407,6 +406,48 @@ contract EscrowMultiProduct is ReentrancyGuard, Ownable {
         require(msg.sender == t.merchant, "Not merchant");
         require(!isRefunded[orderId], "Already refunded");
 
+        orderManager.markCancelled(orderId);
+
+        uint256 amount = t.totalPrice;
+        merchantAmount[t.merchant] -= amount;
+        amountHeld -= amount;
+
+        productNFT.adjustReserved(t.tokenId, t.supply, false);
+
+        (bool sent, ) = payable(t.buyer).call{value: amount}("");
+        require(sent, "Refund failed");
+
+        isRefunded[orderId] = true;
+        isFunded[orderId] = false;
+
+        emit FundRefunded(orderId, t.buyer, t.merchant, amount);
+    }
+
+    /**
+     * @notice Allows buyer to claim automatic refund if merchant fails to decrypt address before deadline
+     * @param orderId Order ID to claim refund for
+     * @dev Refund is only available after decryption deadline expires and before funds are released
+     */
+    function claimRefundAfterDeadline(uint256 orderId) external nonReentrant {
+        TraceNft storage t = details[orderId];
+        require(isFunded[orderId], "Not funded");
+        require(msg.sender == t.buyer, "Not buyer");
+        require(!isRefunded[orderId], "Already refunded");
+        require(!isReleased[orderId], "Already released");
+
+        // Check if this is a physical product with encrypted delivery
+        IProductNFT.Product memory product = productNFT.getProduct(t.tokenId);
+        require(product.productType == keccak256(abi.encodePacked("physical")), "Only physical products");
+
+        // Check if decryption deadline has expired
+        EncryptedDeliveryData storage encrypted = encryptedDeliveries[orderId];
+        require(encrypted.isEncrypted, "No encrypted address");
+        require(block.timestamp > encrypted.decryptionDeadline, "Deadline not expired");
+
+        // Emit deadline expired event
+        emit DecryptionDeadlineExpired(orderId);
+
+        // Mark as cancelled and process refund
         orderManager.markCancelled(orderId);
 
         uint256 amount = t.totalPrice;

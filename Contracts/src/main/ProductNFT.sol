@@ -68,7 +68,7 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
         removeListedProduct(tokenId);
     }
 
-    // ✅ NEW: Auto-unlist function (called by escrow when supply exhausted)
+    //NEW: Auto-unlist function (called by escrow when supply exhausted)
     function autoUnlist(uint256 tokenId) external {
         require(msg.sender == escrowAddress, "Only escrow");
         
