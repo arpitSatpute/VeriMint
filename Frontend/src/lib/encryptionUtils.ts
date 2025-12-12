@@ -1,15 +1,8 @@
-// Required imports for Lit Protocol v7+
-// Add these to your encryptionUtils.ts
+// src/lib/encryptionUtils.ts - Complete Fixed Version for Lit Protocol v7+
 
-import * as LitJsSdk from "@lit-protocol/lit-node-client";
+// ✅ Correct imports for Lit Protocol v7+
 import { LitNodeClient } from "@lit-protocol/lit-node-client";
-import { LitNetwork } from "@lit-protocol/constants";
-import { 
-  LitAbility, 
-  LitAccessControlConditionResource,
-  createSiweMessageWithRecaps,
-  generateAuthSig,
-} from "@lit-protocol/auth-helpers";
+import { LIT_NETWORK, LIT_ABILITY } from "@lit-protocol/constants";
 import { keccak256, encodePacked, getAddress } from "viem";
 import { Buffer } from "buffer";
 
@@ -19,10 +12,11 @@ declare global {
     ethereum?: any;
   }
 }
+
 // ✅ Initialize client for Lit Protocol v7+
 const client = new LitNodeClient({
-  litNetwork: "datil-dev", // Use string literal instead of LitNetwork.DatilDev
-  debug: true, // Enable debug logs
+  litNetwork: 'datil-test', // Use enum - more stable than DatilDev
+  debug: false,
 });
 
 let clientInitialized = false;
@@ -39,7 +33,6 @@ export const initializeLitClient = async () => {
 
 /**
  * Access control conditions for v7+
- * Simpler format in newer versions
  */
 const getAccessControlConditions = (merchantAddress: string) => {
   return [
@@ -59,7 +52,6 @@ const getAccessControlConditions = (merchantAddress: string) => {
 
 /**
  * ✅ Encrypt delivery address - Lit Protocol v7+ format
- * v7 uses a different API: encryptString() instead of encrypt()
  */
 export const encryptDeliveryAddress = async (
   deliveryAddress: string,
@@ -75,8 +67,6 @@ export const encryptDeliveryAddress = async (
     const accessControlConditions = getAccessControlConditions(merchantAddress);
 
     console.log("🔐 Encrypting delivery address with Lit v7+...");
-    console.log("   Data to encrypt:", deliveryAddress);
-    console.log("   Merchant address:", merchantAddress);
 
     // ✅ Lit Protocol v7+ uses client.encrypt()
     const encryptResult = await client.encrypt({
@@ -85,17 +75,11 @@ export const encryptDeliveryAddress = async (
     });
 
     console.log("📦 Encryption result:");
-    console.log("   Type:", typeof encryptResult);
-    console.log("   Keys:", Object.keys(encryptResult));
-
-    // v7+ returns { ciphertext: string, dataToEncryptHash: string }
-    const { ciphertext, dataToEncryptHash } = encryptResult;
-
-    console.log("   Ciphertext length:", ciphertext.length);
-    console.log("   DataToEncryptHash:", dataToEncryptHash);
+    console.log("   Ciphertext length:", encryptResult.ciphertext.length);
+    console.log("   DataToEncryptHash:", encryptResult.dataToEncryptHash);
 
     // In v7+, ciphertext is already a base64 string
-    const encryptedString = ciphertext;
+    const encryptedString = encryptResult.ciphertext;
 
     // Generate ZK commitment
     const addressCommitment = keccak256(
@@ -103,27 +87,66 @@ export const encryptDeliveryAddress = async (
     );
 
     console.log("✅ Address encrypted successfully");
-    console.log("🔑 Commitment:", addressCommitment);
 
     return {
       encryptedString,
-      dataToEncryptHash,
+      dataToEncryptHash: encryptResult.dataToEncryptHash,
       addressCommitment,
     };
   } catch (error: any) {
     console.error("❌ Encryption failed:", error);
-    console.error("   Error details:", {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-    });
     throw new Error(`Failed to encrypt address: ${error?.message || "Unknown error"}`);
   }
 };
 
 /**
- * ✅ Decrypt delivery address - Lit Protocol v7+ format
- * v7 uses decryptToString() instead of decrypt()
+ * ✅ Get session signatures with retry logic
+ */
+async function getSessionSigsWithRetry(
+  authSig: any,
+  maxRetries = 3
+) {
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔑 Getting session signatures (attempt ${attempt}/${maxRetries})...`);
+      
+      const sessionSigs = await client.getSessionSigs({
+        chain: "sepolia",
+        expiration: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
+        resourceAbilityRequests: [],
+        authNeededCallback: async () => {
+          if (!authSig || !authSig.sig || !authSig.address) {
+            throw new Error("Invalid auth signature");
+          }
+          return authSig;
+        },
+      });
+
+      console.log("✅ Session signatures obtained");
+      return sessionSigs;
+      
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`⚠️ Attempt ${attempt} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Exponential backoff
+      const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`⏳ Retrying in ${waitTime}ms...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * ✅ Decrypt delivery address - Lit Protocol v7+ with retry
  */
 export const decryptDeliveryAddress = async (
   encryptedHexFromContract: string,
@@ -137,7 +160,7 @@ export const decryptDeliveryAddress = async (
     const accessControlConditions = getAccessControlConditions(merchantAddress);
 
     console.log("🔐 Decrypting with Lit Protocol v7+...");
-    console.log("   Merchant address:", merchantAddress);
+    console.log("   Network:", client.config.litNetwork);
 
     // Convert hex to base64
     const hexString = encryptedHexFromContract.startsWith('0x') 
@@ -147,28 +170,12 @@ export const decryptDeliveryAddress = async (
     const buffer = Buffer.from(hexString, "hex");
     const ciphertextBase64 = buffer.toString("base64");
 
-    console.log("   Ciphertext analysis:");
-    console.log("     Hex length:", encryptedHexFromContract.length);
-    console.log("     Buffer length:", buffer.length, "bytes");
-    console.log("     Base64 length:", ciphertextBase64.length);
+    console.log("   Buffer length:", buffer.length, "bytes");
 
-    // Get session signatures (required for v7+)
-    console.log("🔑 Getting session signatures...");
-    const sessionSigs = await client.getSessionSigs({
-      chain: "sepolia",
-      expiration: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(), // 24 hours
-      resourceAbilityRequests: [
-        {
-          resource: new LitAccessControlConditionResource("*"),
-          ability: "lit-action-execution" as any, // Use string literal for ability
-        },
-      ],
-      authNeededCallback: async () => authSig,
-    });
+    // Get session signatures with retry
+    const sessionSigs = await getSessionSigsWithRetry(authSig);
 
-    console.log("✅ Session signatures obtained");
-
-    // ✅ Lit Protocol v7+ uses client.decrypt()
+    // Decrypt
     console.log("📡 Calling decrypt()...");
     const decryptResult = await client.decrypt({
       accessControlConditions,
@@ -179,41 +186,35 @@ export const decryptDeliveryAddress = async (
     });
 
     console.log("✅ Decryption successful");
-    console.log("   Result type:", typeof decryptResult);
     
-    // Decode the decrypted data from Uint8Array to string
+    // Decode the result
     const decryptedString = new TextDecoder().decode(decryptResult.decryptedData);
-    console.log("   Result length:", decryptedString.length);
 
     return decryptedString;
 
   } catch (error: any) {
     console.error("❌ Decryption failed:", error);
-    console.error("   Error details:", {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      details: error.details,
-    });
 
     // Enhanced error messages
     if (error.message?.includes("not authorized")) {
       throw new Error("Access denied: You are not authorized to decrypt this address");
     }
-    if (error.message?.includes("expired")) {
-      throw new Error("Decryption deadline has expired");
+    if (error.message?.includes("signing shares") || 
+        error.message?.includes("NodeError") ||
+        error.message?.includes("502") ||
+        error.message?.includes("Bad Gateway")) {
+      throw new Error(
+        "🌐 Lit Protocol network is currently unavailable (502 Bad Gateway). " +
+        "This is a temporary network issue. Please try again in a few minutes, or " +
+        "enable VITE_USE_MOCK_DECRYPTION=true in your .env file for testing."
+      );
     }
     if (error.message?.includes("session")) {
-      throw new Error("Failed to create session signatures. Please try reconnecting your wallet.");
-    }
-    if (error.message?.includes("48 bytes")) {
-      const hexStr = encryptedHexFromContract.startsWith('0x') 
-        ? encryptedHexFromContract.slice(2) 
-        : encryptedHexFromContract;
-      const bufferLength = Buffer.from(hexStr, "hex").length;
       throw new Error(
-        "Ciphertext format mismatch. The data may have been encrypted with a different Lit Protocol version. " +
-        `Got ${bufferLength} bytes. Try re-encrypting with the current version.`
+        "Failed to create session signatures. Possible causes: " +
+        "(1) Lit Protocol nodes are down, " +
+        "(2) Network connectivity issues. " +
+        "Try again or enable mock mode (VITE_USE_MOCK_DECRYPTION=true)."
       );
     }
 
@@ -222,15 +223,14 @@ export const decryptDeliveryAddress = async (
 };
 
 /**
- * ✅ Get authentication signature - v7+ compatible
- * v7+ uses a different SIWE format
+ * ✅ Get authentication signature
  */
 export const getAuthSignature = async (): Promise<any> => {
   try {
-    console.log("🔑 Getting authentication signature for Lit v7+...");
+    console.log("🔑 Getting authentication signature...");
 
     if (typeof window === 'undefined' || !window.ethereum) {
-      throw new Error("No wallet found. Please install MetaMask or another Web3 wallet.");
+      throw new Error("No wallet found. Please install MetaMask.");
     }
 
     const accounts = await window.ethereum.request({ 
@@ -246,12 +246,10 @@ export const getAuthSignature = async (): Promise<any> => {
     // Get latest blockhash for nonce
     const latestBlockhash = await client.getLatestBlockhash();
     
-    // Create SIWE message for v7+
+    // Create SIWE message
     const domain = window.location.host;
     const origin = window.location.origin;
     const statement = "Sign this message to decrypt the delivery address with Lit Protocol.";
-    
-    // v7+ requires this specific format
     const expirationTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const issuedAt = new Date().toISOString();
     
@@ -277,15 +275,12 @@ Expiration Time: ${expirationTime}`;
 
     console.log("✅ Signature obtained");
 
-    // Return in Lit v7+ format
-    const authSig = {
+    return {
       sig: signature,
       derivedVia: "web3.eth.personal.sign",
       signedMessage: siweMessage,
       address: address,
     };
-
-    return authSig;
   } catch (error) {
     console.error("❌ Failed to get auth signature:", error);
     throw error;
@@ -320,7 +315,7 @@ export const generateDeliveryHash = (deliveryAddress: string): `0x${string}` => 
 
 export const isEncryptionSupported = (): boolean => {
   try {
-    if (typeof LitJsSdk === "undefined") {
+    if (typeof LitNodeClient === "undefined") {
       console.warn("⚠️ Lit Protocol SDK not loaded");
       return false;
     }
@@ -339,14 +334,12 @@ export const isEncryptionSupported = (): boolean => {
 
 /**
  * Format encrypted data for contract storage
- * In v7+, ciphertext is already base64, so we convert to hex
  */
 export const formatEncryptedDataForContract = (encryptedData: {
   encryptedString: string;
   dataToEncryptHash: string;
   addressCommitment: string;
 }) => {
-  // encryptedString is base64 in v7+
   const encryptedBytes = `0x${Buffer.from(
     encryptedData.encryptedString,
     "base64"
@@ -361,7 +354,6 @@ export const formatEncryptedDataForContract = (encryptedData: {
 
 /**
  * Parse encrypted data from contract
- * Converts hex bytes back to base64 string for Lit Protocol v7+
  */
 export const parseEncryptedDataFromContract = (
   encryptedBytes: `0x${string}`

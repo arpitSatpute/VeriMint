@@ -3,8 +3,8 @@ import { useState, useEffect } from "react"
 import { useParams, useLocation, useNavigate } from "react-router-dom"
 import { 
   ArrowLeft, Package, Clock, CheckCircle, XCircle, Truck, 
-  MapPin, Hash, Eye, EyeOff, RefreshCw, AlertCircle,
-  ShoppingCart, Loader2
+  MapPin, Hash, Eye, EyeOff, RefreshCw, AlertCircle, Unlock,
+  ShoppingCart, Loader2, AlertTriangle
 } from "lucide-react"
 import { useAccount } from "wagmi"
 import { readContract, writeContract, waitForTransactionReceipt } from "wagmi/actions"
@@ -14,6 +14,7 @@ import ORDER_MANAGER_ABI from "@/abis/orderManager.json"
 import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 import { keccak256, encodePacked } from "viem"
 import DefaultLayout from "@/layouts/default"
+import ElegantShapes from "@/components/ElegantShapes"
 
 interface OrderDetails {
   orderId: string
@@ -44,6 +45,9 @@ export default function DeliveryPage() {
   const [decodedAddress, setDecodedAddress] = useState<string>("")
   const [isMerchant, setIsMerchant] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [decryptionDeadline, setDecryptionDeadline] = useState<number>(0)
+  const [timeRemaining, setTimeRemaining] = useState<string>("")
+  const [deadlineExpired, setDeadlineExpired] = useState(false)
 
   const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`
   const ORDER_MANAGER_ADDRESS = import.meta.env.VITE_ORDER_MANAGER_ADDRESS as `0x${string}`
@@ -52,6 +56,74 @@ export default function DeliveryPage() {
   useEffect(() => {
     loadOrderDetails()
   }, [orderId, address])
+
+  useEffect(() => {
+    if (order?.type === "physical" && orderId && address) {
+      // Only fetch if user is merchant or buyer
+      const isMerchantOrBuyer = 
+        address.toLowerCase() === order.merchantAddress?.toLowerCase() ||
+        address.toLowerCase() === order.buyerAddress?.toLowerCase()
+      
+      if (isMerchantOrBuyer) {
+        fetchDecryptionDeadline()
+      }
+    }
+  }, [order, orderId, address])
+
+  useEffect(() => {
+    if (decryptionDeadline > 0) {
+      const updateTimer = () => {
+        const now = Math.floor(Date.now() / 1000)
+        const remaining = decryptionDeadline - now
+        
+        if (remaining <= 0) {
+          setTimeRemaining("Expired")
+          setDeadlineExpired(true)
+        } else {
+          const days = Math.floor(remaining / 86400)
+          const hours = Math.floor((remaining % 86400) / 3600)
+          const minutes = Math.floor((remaining % 3600) / 60)
+          
+          if (days > 0) {
+            setTimeRemaining(`${days}d ${hours}h`)
+          } else if (hours > 0) {
+            setTimeRemaining(`${hours}h ${minutes}m`)
+          } else {
+            setTimeRemaining(`${minutes}m`)
+          }
+          setDeadlineExpired(false)
+        }
+      }
+      
+      updateTimer()
+      const interval = setInterval(updateTimer, 60000)
+      return () => clearInterval(interval)
+    }
+  }, [decryptionDeadline])
+
+  const fetchDecryptionDeadline = async () => {
+    if (!orderId || orderId === "0") return
+    
+    try {
+      const deliveryData = await readContract(config, {
+        address: ESCROW_ADDRESS,
+        abi: ESCROW_ABI,
+        functionName: "getEncryptedDeliveryData",
+        args: [BigInt(orderId)],
+      }) as any
+      
+      // deliveryData[3] is decryptionDeadline in the return tuple
+      if (deliveryData && deliveryData[3]) {
+        setDecryptionDeadline(Number(deliveryData[3]))
+      }
+    } catch (error: any) {
+      // Silently ignore "No encrypted data" or authorization errors for non-encrypted orders
+      const errorMsg = error?.message || ""
+      if (!errorMsg.includes("No encrypted data") && !errorMsg.includes("Not authorized")) {
+        console.error("Failed to fetch decryption deadline:", error)
+      }
+    }
+  }
 
   const loadOrderDetails = async () => {
     if (!orderId) return
@@ -294,6 +366,43 @@ export default function DeliveryPage() {
     }
   }
 
+  const claimAutoRefund = async () => {
+    if (!order || isMerchant) return
+    
+    if (!deadlineExpired) {
+      alert("Decryption deadline has not expired yet.")
+      return
+    }
+
+    if (!confirm(
+      "The merchant failed to decrypt your delivery address within the deadline. " +
+      "This will cancel the order and refund your payment. Continue?"
+    )) {
+      return
+    }
+
+    setUpdating(true)
+
+    try {
+      const tx = await writeContract(config, {
+        address: ESCROW_ADDRESS,
+        abi: ESCROW_ABI,
+        functionName: "claimRefundAfterDeadline",
+        args: [BigInt(order.orderId)],
+      })
+
+      await waitForTransactionReceipt(config, { hash: tx })
+      alert("✅ Refund claimed successfully! Funds have been returned to your wallet.")
+      await loadOrderDetails()
+    } catch (error: any) {
+      console.error("Failed to claim refund:", error)
+      const errorMsg = error?.message || error?.shortMessage || "Unknown error"
+      alert(`❌ Failed to claim refund:\n${errorMsg}`)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   const getStatusInfo = (status: number) => {
     const statuses = [
       { label: "Pending", icon: Clock, color: "amber" },
@@ -353,6 +462,8 @@ export default function DeliveryPage() {
     <DefaultLayout>
       <div className="relative min-h-screen w-full bg-[#030303] pb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
+        
+        <ElegantShapes variant="default" />
 
         <div className="relative z-10 container mx-auto px-4 md:px-6 py-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
@@ -507,6 +618,38 @@ export default function DeliveryPage() {
                 </motion.div>
               )}
 
+              {/* Buyer Auto-Refund (if deadline expired) */}
+              {!isMerchant && deadlineExpired && order.type === "physical" && order.orderState === 0 && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 backdrop-blur-sm border-2 border-rose-500/30 rounded-2xl p-6">
+                  <h2 className="text-lg font-semibold text-rose-300 mb-4 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" />
+                    Decryption Deadline Expired
+                  </h2>
+
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 mb-4">
+                    <p className="text-sm text-rose-200 mb-2">
+                      ⚠️ The merchant did not decrypt your delivery address within the 7-day deadline.
+                    </p>
+                    <p className="text-xs text-rose-300/70">
+                      You are eligible to claim an automatic refund. The order will be cancelled and your payment will be returned to your wallet.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={claimAutoRefund}
+                    disabled={updating}
+                    className="w-full px-4 py-3 bg-rose-500/20 border-2 border-rose-500/50 rounded-xl text-rose-300 font-semibold hover:bg-rose-500/30 hover:border-rose-500/70 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <AlertTriangle className="w-5 h-5" />}
+                    {updating ? "Processing..." : "Claim Automatic Refund"}
+                  </button>
+
+                  <p className="text-xs text-white/40 text-center mt-3">
+                    💰 Full refund of {order.price} ETH will be returned to your wallet
+                  </p>
+                </motion.div>
+              )}
+
               {/* Buyer Confirm Delivery */}
               {canConfirmDelivery && (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 backdrop-blur-sm border-2 border-emerald-500/30 rounded-2xl p-6">
@@ -602,6 +745,70 @@ export default function DeliveryPage() {
                 </div>
               </motion.div>
 
+              {/* Decryption Deadline Info */}
+              {order.type === "physical" && decryptionDeadline > 0 && (
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className={`backdrop-blur-sm border rounded-2xl p-6 ${
+                  deadlineExpired 
+                    ? 'bg-rose-500/10 border-rose-500/30' 
+                    : 'bg-white/[0.02] border-white/[0.08]'
+                }`}>
+                  <h2 className={`text-lg font-semibold mb-4 flex items-center gap-2 ${
+                    deadlineExpired ? 'text-rose-300' : 'text-white/90'
+                  }`}>
+                    {deadlineExpired ? <AlertTriangle className="w-5 h-5" /> : <Clock className="w-5 h-5 text-indigo-400" />}
+                    Decryption Deadline
+                  </h2>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
+                      <span className="text-sm text-white/50">Expires</span>
+                      <span className="text-sm text-white/80">
+                        {new Date(decryptionDeadline * 1000).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-sm text-white/50">Time Remaining</span>
+                      <span className={`text-sm font-mono font-semibold ${
+                        deadlineExpired 
+                          ? 'text-rose-400' 
+                          : timeRemaining.includes('d') 
+                            ? 'text-emerald-400' 
+                            : 'text-amber-400'
+                      }`}>
+                        {timeRemaining || "Calculating..."}
+                      </span>
+                    </div>
+                  </div>
+
+                  {deadlineExpired && !isMerchant && (
+                    <div className="mt-4 p-3 bg-rose-500/20 border border-rose-500/40 rounded-lg">
+                      <p className="text-xs text-rose-200">
+                        ⚠️ Deadline expired. You can claim a refund above.
+                      </p>
+                    </div>
+                  )}
+
+                  {deadlineExpired && isMerchant && (
+                    <div className="mt-4 p-3 bg-rose-500/20 border border-rose-500/40 rounded-lg">
+                      <p className="text-xs text-rose-200">
+                        ⚠️ Deadline expired. Buyer can now claim a refund.
+                      </p>
+                    </div>
+                  )}
+
+                  {!deadlineExpired && (
+                    <div className="mt-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                      <p className="text-xs text-indigo-200">
+                        {isMerchant 
+                          ? '📦 Decrypt the address to get shipping details' 
+                          : '⏱️ Merchant has time to decrypt your address'}
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
               {/* Delivery Address (Merchant Only) */}
               {isMerchant && order.type === "physical" && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-2xl p-6">
@@ -611,22 +818,16 @@ export default function DeliveryPage() {
                   </h2>
 
                   <button
-                    onClick={decodeDeliveryAddress}
+                    onClick={() => navigate(`/decrypt/${order.orderId}`)}
                     className="w-full px-4 py-3 bg-violet-500/20 border border-violet-500/30 rounded-xl text-violet-300 font-medium hover:bg-violet-500/30 transition-all flex items-center justify-center gap-2"
                   >
-                    {showAddress ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    {showAddress ? "Hide Address" : "Show Delivery Info"}
+                    <Unlock className="w-4 h-4" />
+                    Decrypt Delivery Address
                   </button>
 
-                  {showAddress && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="mt-4 p-4 bg-white/[0.03] border border-white/[0.08] rounded-xl"
-                    >
-                      <p className="text-sm text-white/70">{decodedAddress}</p>
-                    </motion.div>
-                  )}
+                  <div className="mt-3 text-xs text-white/50 text-center">
+                    Access restricted to merchant while order is active
+                  </div>
                 </motion.div>
               )}
             </div>

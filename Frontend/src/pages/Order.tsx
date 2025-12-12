@@ -8,44 +8,7 @@ import ORDER_MANAGER_ABI from "@/abis/orderManager.json"
 import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 import DefaultLayout from "@/layouts/default"
 import { useNavigate } from "react-router-dom"
-
-type ElegantShapeProps = {
-  className?: string
-  delay?: number
-  width?: number
-  height?: number
-  rotate?: number
-  gradient?: string
-}
-
-function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }: ElegantShapeProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
-      animate={{ opacity: 1, y: 0, rotate: rotate }}
-      transition={{
-        duration: 2.4,
-        delay,
-        ease: [0.23, 0.86, 0.39, 0.96],
-        opacity: { duration: 1.2 },
-      }}
-      className={`absolute ${className}`}
-    >
-      <motion.div
-        animate={{ y: [0, 15, 0] }}
-        transition={{
-          duration: 12,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        style={{ width, height }}
-        className="relative"
-      >
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r to-transparent backdrop-blur-[2px] border-2 border-white/[0.15] shadow-[0_8px_32px_0_rgba(255,255,255,0.1)]" style={{ backgroundImage: `linear-gradient(to right, ${gradient.replace('from-', '')}, transparent)` }} />
-      </motion.div>
-    </motion.div>
-  )
-}
+import ElegantShapes from "@/components/ElegantShapes"
 
 type DeliveryStatus = 'Pending' | 'InTransit' | 'Delivered' | 'Failed'
 type OrderState = 'Created' | 'Released' | 'Cancelled'
@@ -84,8 +47,33 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
   }
 
   const { icon: StatusIcon, color, label } = statusConfig[order.status]
-  const showAddress = isMerchant && order.status === 'processing'
   const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    navigate(`/delivery/${order.orderId}`, {
+      state: {
+        orderData: {
+          orderId: order.orderId,
+          tokenId: order.tokenId,
+          name: order.name,
+          description: order.description || "",
+          image: order.image,
+          price: order.price,
+          type: order.type,
+          supply: order.supply,
+          buyerAddress: order.buyerAddress,
+          merchantAddress: order.merchantAddress,
+          deliveryStatus: order.deliveryStatus === 'Pending' ? 0 : 
+                        order.deliveryStatus === 'InTransit' ? 1 :
+                        order.deliveryStatus === 'Delivered' ? 2 : 3,
+          orderState: order.orderState === 'Created' ? 0 :
+                    order.orderState === 'Released' ? 1 : 2,
+          createdAt: new Date(order.date).getTime() / 1000,
+          deliveryPointHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+        }
+      }
+    })
+  }
 
   return (
     <motion.div
@@ -96,7 +84,8 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
         delay: index * 0.05,
         ease: [0.25, 0.4, 0.25, 1],
       }}
-      className="group relative bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 md:p-5 hover:border-white/[0.15] hover:bg-white/[0.04] transition-all duration-300"
+      onClick={handleCardClick}
+      className="group relative cursor-pointer bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 md:p-5 hover:border-white/[0.15] hover:bg-white/[0.04] transition-all duration-300"
     >
       <div className="flex flex-col md:flex-row md:items-center gap-4">
         <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -148,63 +137,6 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
             </div>
             <div className="text-xs text-white/40">{order.date}</div>
           </div>
-
-          {showAddress && (
-            <div className="md:w-48">
-              <div className="text-xs text-white/40 mb-1">Buyer Address</div>
-              <div className="font-mono text-xs text-white/70 bg-white/[0.03] border border-white/[0.08] rounded px-2 py-1 truncate">
-                {order.buyerAddress}
-              </div>
-            </div>
-          )}
-
-          {showAddress && (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => {
-                e.stopPropagation()
-                navigate(`/decrypt/${order.orderId}`)
-              }}
-              className="px-4 py-2 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-500/30 hover:border-indigo-500/50 transition-all shrink-0"
-            >
-              🔓 Show Address
-            </motion.button>
-          )}
-
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={(e) => {
-              e.stopPropagation()
-              navigate(`/delivery/${order.orderId}`, {
-                state: {
-                  orderData: {
-                    orderId: order.orderId,
-                    tokenId: order.tokenId,
-                    name: order.name,
-                    description: order.description || "",
-                    image: order.image,
-                    price: order.price,
-                    type: order.type,
-                    supply: order.supply,
-                    buyerAddress: order.buyerAddress,
-                    merchantAddress: order.merchantAddress,
-                    deliveryStatus: order.deliveryStatus === 'Pending' ? 0 : 
-                                  order.deliveryStatus === 'InTransit' ? 1 :
-                                  order.deliveryStatus === 'Delivered' ? 2 : 3,
-                    orderState: order.orderState === 'Created' ? 0 :
-                              order.orderState === 'Released' ? 1 : 2,
-                    createdAt: new Date(order.date).getTime() / 1000,
-                    deliveryPointHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-                  }
-                }
-              })
-            }}
-            className="px-4 py-2 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white/70 text-sm font-medium hover:border-white/[0.15] hover:text-white/90 transition-all shrink-0"
-          >
-            View Details
-          </motion.button>
         </div>
       </div>
     </motion.div>
@@ -478,11 +410,7 @@ export default function Order() {
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <ElegantShape delay={0.3} width={500} height={120} rotate={12} gradient="indigo-500/[0.12]" className="left-[-8%] top-[10%]" />
-        <ElegantShape delay={0.5} width={400} height={100} rotate={-15} gradient="rose-500/[0.12]" className="right-[-5%] bottom-[15%]" />
-        <ElegantShape delay={0.4} width={250} height={70} rotate={-8} gradient="violet-500/[0.12]" className="left-[8%] bottom-[8%]" />
-      </div>
+      <ElegantShapes variant="default" />
 
       <div className="relative z-10 container mx-auto px-4 md:px-6 py-8 md:py-12">
         <motion.div
