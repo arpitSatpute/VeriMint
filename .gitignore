@@ -76,3 +76,5 @@ lerna-debug.log*
 Thumbs.db
 .AppleDouble
 .LSOverride
+
+**/broadcast/

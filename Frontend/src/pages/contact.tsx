@@ -7,6 +7,7 @@ import {
   Send,
   Github,
   Twitter,
+  Linkedin,
   Globe,
   Clock
 } from "lucide-react";
@@ -144,6 +145,12 @@ export default function ContactPage() {
       name: "X (Twitter)",
       username: "@arpits_jsx",
       href: "https://twitter.com/arpits_jsx",
+    },
+    {
+      icon: Linkedin,
+      name: "LinkedIn",
+      username: "Arpit Satpute",
+      href: "https://www.linkedin.com/in/arpit-satpute-81a2b3228/",
     },
   ];
 

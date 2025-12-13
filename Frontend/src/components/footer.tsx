@@ -1,5 +1,5 @@
 import { Link } from "@heroui/link";
-import { Shield, FileText, BookOpen, MessageCircle, Twitter, Github, Mail } from "lucide-react";
+import { Shield, FileText, BookOpen, MessageCircle, Twitter, Github, Mail, Linkedin } from "lucide-react";
 
 export const Footer = () => {
   const footerLinks = {
@@ -11,8 +11,8 @@ export const Footer = () => {
     ],
     resources: [
       { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
       { label: "How It Works", href: "/info" },
-      { label: "Smart Contracts", href: "/docs#smart-contracts" },
       { label: "Security", href: "/docs#security" },
     ],
     legal: [
@@ -22,9 +22,10 @@ export const Footer = () => {
   };
 
   const socialLinks = [
-    { icon: Twitter, href: "https://twitter.com/verimint", label: "Twitter" },
-    { icon: Github, href: "https://github.com/verimint", label: "GitHub" },
-    { icon: Mail, href: "mailto:contact@verimint.com", label: "Email" },
+    { icon: Twitter, href: "https://twitter.com/arpits_jsx", label: "Twitter" },
+    { icon: Github, href: "https://github.com/arpitSatpute", label: "GitHub" },
+    { icon: Linkedin, href: "https://www.linkedin.com/in/arpitsatpute/", label: "LinkedIn" },
+    { icon: Mail, href: "mailto:arpitrameshsatpute6986@gmail.com", label: "Email" },
   ];
 
   return (
