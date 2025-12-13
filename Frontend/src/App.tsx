@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import IndexPage from "./pages/index";
+import DocsPage from "./pages/DocsPage";
 import Order from "./pages/Order";
 import Product from "./pages/Product";
 import AboutPage from "./pages/about";
@@ -27,6 +28,7 @@ function App() {
         <QueryClientProvider client={queryClient} >
           <Routes>
             <Route element={<IndexPage />} path="/" />
+            <Route element={<DocsPage />} path="/docs" />
             <Route element={<Merchant />} path="/merchant" />
             <Route element={<Product />} path="/product" />
             <Route element={<Order />} path="/order" />

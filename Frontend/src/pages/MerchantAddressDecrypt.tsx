@@ -30,8 +30,41 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
     timestamp: number;
   } | null>(null);
   const [deadline, setDeadline] = useState<number>(0);
+  const [showBlackScreen, setShowBlackScreen] = useState(false);
 
   const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`;
+
+  // Screenshot prevention - black screen on Command/Windows key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Command (Mac) or Windows/Meta key
+      if (e.metaKey || e.key === 'Meta' || e.key === 'OS') {
+        setShowBlackScreen(true);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Remove black screen when key is released
+      if (e.key === 'Meta' || e.key === 'OS' || !e.metaKey) {
+        setShowBlackScreen(false);
+      }
+    };
+
+    // Handle window blur (when user switches apps while holding key)
+    const handleBlur = () => {
+      setShowBlackScreen(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   useEffect(() => {
     loadEncryptedData();
@@ -746,6 +779,28 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
           </div>
         </div>
       </motion.div>
+
+      {/* Black Screen Overlay - Screenshot Prevention */}
+      {showBlackScreen && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black flex items-center justify-center"
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh'
+          }}
+        >
+          <div className="text-center text-white p-8">
+            <Lock className="w-16 h-16 mx-auto mb-4 text-white/80" />
+            <p className="text-2xl font-bold mb-2">Screen Protected</p>
+            <p className="text-white/70">Release the key to continue viewing</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
