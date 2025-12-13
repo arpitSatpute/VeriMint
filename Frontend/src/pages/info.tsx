@@ -1,695 +1,622 @@
-import React, { useState } from 'react';
-import { Shield, Lock, MessageSquare, Key, AlertTriangle, CheckCircle, ExternalLink, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { motion } from "framer-motion";
+import DefaultLayout from "@/layouts/default";
+import { cn } from "@/lib/utils";
+import { 
+  Shield, 
+  Lock, 
+  Wallet, 
+  ShoppingBag,
+  Package,
+  Truck,
+  CheckCircle,
+  ArrowRight,
+  ArrowDown,
+  Users,
+  FileText,
+  Key,
+  Layers,
+  Zap,
+  Eye,
+  AlertCircle
+} from "lucide-react";
 
-const SecurityGuide = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [copiedIndex, setCopiedIndex] = useState(null);
+function ElegantShape({
+  className,
+  delay = 0,
+  width = 400,
+  height = 100,
+  rotate = 0,
+  gradient = "from-white/[0.08]",
+}: {
+  className?: string
+  delay?: number
+  width?: number
+  height?: number
+  rotate?: number
+  gradient?: string
+}) {
+  return (
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: -150,
+        rotate: rotate - 15,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        rotate: rotate,
+      }}
+      transition={{
+        duration: 2.4,
+        delay,
+        ease: [0.23, 0.86, 0.39, 0.96],
+        opacity: { duration: 1.2 },
+      }}
+      className={cn("absolute", className)}
+    >
+      <motion.div
+        animate={{
+          y: [0, 15, 0],
+        }}
+        transition={{
+          duration: 12,
+          repeat: Number.POSITIVE_INFINITY,
+          ease: "easeInOut",
+        }}
+        style={{
+          width,
+          height,
+        }}
+        className="relative"
+      >
+        <div
+          className={cn(
+            "absolute inset-0 rounded-full",
+            "bg-gradient-to-r to-transparent",
+            gradient,
+            "backdrop-blur-[2px] border-2 border-white/[0.15]",
+            "shadow-[0_8px_32px_0_rgba(255,255,255,0.1)]",
+            "after:absolute after:inset-0 after:rounded-full",
+            "after:bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.2),transparent_70%)]",
+          )}
+        />
+      </motion.div>
+    </motion.div>
+  )
+}
 
-  const copyToClipboard = (text: string, index: any) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
-
-  const sections = {
-    overview: {
-      title: "Security Overview",
-      icon: Shield,
-      content: [
-        {
-          title: "Current Security Gaps",
-          type: "warning",
-          items: [
-            "Delivery addresses are hashed but merchant needs plaintext for shipping",
-            "No secure communication channel between merchant and buyer",
-            "Merchant's contact info not encrypted or hidden",
-            "No verification mechanism for delivery updates",
-            "Potential privacy leaks through on-chain data"
-          ]
-        },
-        {
-          title: "Recommended Security Layers",
-          type: "success",
-          items: [
-            "End-to-End Encrypted Messaging (E2EE)",
-            "Zero-Knowledge Proof Address Verification",
-            "Decentralized Identity (DID) System",
-            "Time-Locked Communication Windows",
-            "Reputation System with Privacy Preservation"
-          ]
-        }
-      ]
-    },
-    encryption: {
-      title: "Encryption Solutions",
-      icon: Lock,
-      content: [
-        {
-          title: "1. XMTP Protocol Integration",
-          description: "Decentralized messaging protocol using wallet addresses",
-          code: `// Install XMTP
-npm install @xmtp/xmtp-js
-
-// Implementation
-import { Client } from '@xmtp/xmtp-js';
-
-const initXMTP = async (signer) => {
-  const xmtp = await Client.create(signer, { 
-    env: 'production' 
-  });
-  return xmtp;
+const fadeInUp = {
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true },
+  transition: { duration: 0.5 }
 };
 
-const sendMessage = async (xmtp, recipientAddress, message) => {
-  const conversation = await xmtp.conversations.newConversation(
-    recipientAddress
-  );
-  await conversation.send(message);
-};`,
-          benefits: [
-            "E2E encrypted by default",
-            "Uses wallet addresses (no email/phone needed)",
-            "Messages stored on decentralized network",
-            "No central server to compromise"
-          ]
-        },
-        {
-          title: "2. Lit Protocol for Access Control",
-          description: "Decrypt delivery info only when conditions met",
-          code: `// Install Lit Protocol
-npm install @lit-protocol/lit-node-client
-
-// Encrypt delivery address
-const encryptDeliveryAddress = async (address, orderId) => {
-  const accessControlConditions = [
+export default function InfoPage() {
+  const workflowSteps = [
     {
-      contractAddress: ESCROW_ADDRESS,
-      method: 'isFunded',
-      parameters: [orderId],
-      returnValueTest: {
-        comparator: '=',
-        value: 'true'
-      }
+      id: 1,
+      phase: "Merchant Setup",
+      title: "Create & Mint Products",
+      icon: Package,
+      color: "indigo",
+      steps: [
+        "Connect wallet to VeriMint platform",
+        "Create product listing with details (name, description, price)",
+        "Upload product images to IPFS",
+        "Mint NFT using ERC-1155 standard",
+        "Set supply quantity and pricing",
+        "List product on marketplace"
+      ],
+      techs: ["ERC-1155 NFT", "IPFS Storage", "Smart Contract"]
+    },
+    {
+      id: 2,
+      phase: "Buyer Discovery",
+      title: "Browse & Select Products",
+      icon: ShoppingBag,
+      color: "purple",
+      steps: [
+        "Browse marketplace for available products",
+        "View product details, pricing, and supply",
+        "Check merchant reputation and history",
+        "Select desired product and quantity",
+        "Review total cost including gas fees"
+      ],
+      techs: ["Web3 Integration", "NFT Metadata", "Real-time Updates"]
+    },
+    {
+      id: 3,
+      phase: "Order Placement",
+      title: "Create Order with Escrow",
+      icon: Wallet,
+      color: "pink",
+      steps: [
+        "Enter encrypted delivery address (Lit Protocol)",
+        "Review order summary and terms",
+        "Approve transaction on wallet",
+        "Funds locked in smart contract escrow",
+        "NFT supply automatically reserved",
+        "Order confirmation generated on-chain"
+      ],
+      techs: ["Escrow Smart Contract", "Lit Protocol Encryption", "On-chain Verification"]
+    },
+    {
+      id: 4,
+      phase: "Address Decryption",
+      title: "Merchant Access",
+      icon: Key,
+      color: "rose",
+      steps: [
+        "Merchant receives order notification",
+        "Access encrypted delivery address page",
+        "Decrypt address using Lit Protocol conditions",
+        "View delivery details and instructions",
+        "Prepare product for shipment",
+        "Screenshot protection active during viewing"
+      ],
+      techs: ["Lit Protocol", "Access Control", "Privacy Protection"]
+    },
+    {
+      id: 5,
+      phase: "Delivery Process",
+      title: "Shipment & Tracking",
+      icon: Truck,
+      color: "orange",
+      steps: [
+        "Merchant updates order status to 'In Transit'",
+        "Shipping details recorded on-chain",
+        "Buyer receives status update notification",
+        "Track delivery progress",
+        "Merchant marks as 'Delivered'",
+        "Buyer confirms receipt"
+      ],
+      techs: ["State Machine", "Event Emissions", "Status Tracking"]
+    },
+    {
+      id: 6,
+      phase: "Fund Release",
+      title: "Payment Settlement",
+      icon: CheckCircle,
+      color: "green",
+      steps: [
+        "Buyer confirms delivery receipt",
+        "Smart contract validates confirmation",
+        "Escrow releases funds to merchant",
+        "NFT ownership transfers to buyer",
+        "Transaction completed on blockchain",
+        "Both parties receive confirmation"
+      ],
+      techs: ["Automated Settlement", "NFT Transfer", "Fund Distribution"]
     }
   ];
 
-  const { ciphertext, dataToEncryptHash } = 
-    await LitJsSdk.encryptString(address);
-
-  return { 
-    ciphertext, 
-    dataToEncryptHash, 
-    accessControlConditions 
-  };
-};`,
-          benefits: [
-            "Merchant can only decrypt after order funded",
-            "Automatic access revocation after delivery",
-            "No trusted third party needed",
-            "On-chain condition verification"
-          ]
-        }
-      ]
-    },
-    zkProof: {
-      title: "Zero-Knowledge Proofs",
-      icon: Eye,
-      content: [
-        {
-          title: "ZK Address Verification",
-          description: "Prove delivery location validity without revealing address",
-          code: `// Using Semaphore Protocol
-npm install @semaphore-protocol/identity @semaphore-protocol/proof
-
-// Generate ZK proof of valid address
-const generateAddressProof = async (address, groupId) => {
-  const identity = new Identity(address);
-  
-  const fullProof = await generateProof(
-    identity,
-    groupId,
-    "delivery-verification",
+  const securityFeatures = [
     {
-      zkeyFilePath: "./semaphore.zkey",
-      wasmFilePath: "./semaphore.wasm"
-    }
-  );
-
-  return fullProof;
-};
-
-// Merchant verifies without seeing actual address
-const verifyAddress = async (proof, publicSignals) => {
-  return await verifyProof(proof, publicSignals);
-};`,
-          benefits: [
-            "Merchant verifies deliverability without seeing address",
-            "Buyer maintains privacy until necessary",
-            "Cryptographic guarantee of validity",
-            "Prevents fake address submissions"
-          ]
-        },
-        {
-          title: "ZK Range Proofs for Shipping Cost",
-          description: "Prove shipping cost is within range without exact amount",
-          implementation: [
-            "Use zk-SNARKs to prove: 'shipping cost < $50'",
-            "Buyer commits to cost range, merchant verifies",
-            "Protects pricing strategies of both parties",
-            "Prevents location-based price discrimination"
-          ]
-        }
-      ]
+      icon: Lock,
+      title: "End-to-End Encryption",
+      description: "All delivery addresses encrypted using Lit Protocol with on-chain access control conditions."
     },
-    did: {
-      title: "Decentralized Identity",
-      icon: Key,
-      content: [
-        {
-          title: "Ceramic Network DID Integration",
-          description: "Self-sovereign identity for reputation without centralization",
-          code: `// Install Ceramic
-npm install @ceramicnetwork/http-client dids
-
-// Create DID for user
-const createUserDID = async (seed) => {
-  const ceramic = new CeramicClient('https://ceramic.network');
-  const did = new DID({
-    provider: new Ed25519Provider(seed),
-    resolver: getResolver()
-  });
-  
-  await did.authenticate();
-  ceramic.did = did;
-  
-  return did;
-};
-
-// Store encrypted contact info in Ceramic
-const storeContactInfo = async (ceramic, contactInfo) => {
-  const encryptedData = await ceramic.did.createJWE(
-    contactInfo,
-    [recipientDID]
-  );
-  
-  const doc = await ceramic.createDocument('tile', {
-    content: encryptedData
-  });
-  
-  return doc.id.toString();
-};`,
-          benefits: [
-            "User controls their own data",
-            "Portable reputation across platforms",
-            "Selective disclosure of information",
-            "No central authority"
-          ]
-        },
-        {
-          title: "Verifiable Credentials for Merchants",
-          description: "Cryptographic proof of merchant legitimacy",
-          implementation: [
-            "Issue VCs for verified merchants",
-            "Buyers can verify without central registry",
-            "Revocable if merchant misbehaves",
-            "Privacy-preserving verification"
-          ]
-        }
-      ]
-    },
-    implementation: {
-      title: "Implementation Strategy",
-      icon: CheckCircle,
-      content: [
-        {
-          title: "Phase 1: Message Encryption (Week 1-2)",
-          steps: [
-            "Integrate XMTP for basic messaging",
-            "Add message UI in delivery page",
-            "Encrypt all communications by default",
-            "Test with physical product orders"
-          ]
-        },
-        {
-          title: "Phase 2: Address Encryption (Week 3-4)",
-          steps: [
-            "Implement Lit Protocol access control",
-            "Encrypt delivery addresses on-chain",
-            "Set decryption conditions (order funded, merchant verified)",
-            "Add merchant decryption UI",
-            "Time-lock decryption (expires after delivery window)"
-          ]
-        },
-        {
-          title: "Phase 3: ZK Proofs (Week 5-6)",
-          steps: [
-            "Implement ZK address validation circuit",
-            "Add proof generation on buyer side",
-            "Integrate verification in smart contract",
-            "Test with various address formats"
-          ]
-        },
-        {
-          title: "Phase 4: DID Integration (Week 7-8)",
-          steps: [
-            "Set up Ceramic nodes",
-            "Create DID documents for users",
-            "Implement reputation system",
-            "Add verifiable credentials for merchants"
-          ]
-        }
-      ]
-    },
-    smartContract: {
-      title: "Smart Contract Updates",
+    {
       icon: Shield,
-      content: [
-        {
-          title: "Enhanced Escrow Contract",
-          code: `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.27;
-
-contract SecureEscrow {
-    struct EncryptedDelivery {
-        bytes encryptedAddress;      // Lit Protocol encrypted
-        bytes32 addressCommitment;   // ZK commitment
-        uint256 decryptionDeadline;  // Time-locked access
-        bool merchantDecrypted;
-        bool buyerRevealed;
-    }
-    
-    mapping(uint256 => EncryptedDelivery) public deliveryData;
-    
-    // Store encrypted address with access control
-    function submitEncryptedAddress(
-        uint256 orderId,
-        bytes calldata encryptedAddress,
-        bytes32 commitment,
-        bytes calldata zkProof
-    ) external {
-        require(verifyZKProof(commitment, zkProof), "Invalid proof");
-        
-        deliveryData[orderId] = EncryptedDelivery({
-            encryptedAddress: encryptedAddress,
-            addressCommitment: commitment,
-            decryptionDeadline: block.timestamp + 7 days,
-            merchantDecrypted: false,
-            buyerRevealed: false
-        });
-    }
-    
-    // Merchant requests decryption (logged for dispute)
-    function requestAddressDecryption(uint256 orderId) 
-        external 
-        onlyMerchant(orderId) 
+      title: "Smart Contract Escrow",
+      description: "Funds secured in audited smart contracts, released only upon confirmed delivery."
+    },
     {
-        require(!deliveryData[orderId].merchantDecrypted, "Already decrypted");
-        require(block.timestamp < deliveryData[orderId].decryptionDeadline, 
-            "Decryption expired");
-        
-        deliveryData[orderId].merchantDecrypted = true;
-        emit AddressDecryptionRequested(orderId, msg.sender);
+      icon: Eye,
+      title: "Screenshot Protection",
+      description: "Anti-screenshot measures protect sensitive merchant information from unauthorized capture."
+    },
+    {
+      icon: Layers,
+      title: "Decentralized Storage",
+      description: "Product data and images stored on IPFS for permanent, censorship-resistant access."
     }
-    
-    // Verify ZK proof of address validity
-    function verifyZKProof(
-        bytes32 commitment, 
-        bytes calldata proof
-    ) internal view returns (bool) {
-        // Integrate with ZK verifier contract
-        return zkVerifier.verify(proof, commitment);
-    }
-}`,
-          security: [
-            "Address encrypted with Lit Protocol",
-            "ZK proof verifies validity before storage",
-            "Time-locked decryption prevents abuse",
-            "All access attempts logged on-chain",
-            "Automatic expiration after delivery window"
-          ]
-        }
+  ];
+
+  const roles = [
+    {
+      title: "For Merchants",
+      icon: Users,
+      benefits: [
+        "Mint products as NFTs with full ownership",
+        "Automatic payment escrow protection",
+        "Decrypted delivery access only after payment",
+        "Transparent order management system",
+        "Build on-chain reputation"
       ]
     },
-    uiChanges: {
-      title: "Frontend Security Features",
-      icon: MessageSquare,
-      content: [
-        {
-          title: "Secure Messaging Component",
-          code: `// SecureChat.tsx
-import { Client } from '@xmtp/xmtp-js';
-import { useSigner } from 'wagmi';
-
-const SecureChat = ({ orderId, merchantAddress }) => {
-  const { data: signer } = useSigner();
-  const [xmtp, setXmtp] = useState(null);
-  const [messages, setMessages] = useState([]);
-
-  useEffect(() => {
-    const initChat = async () => {
-      const client = await Client.create(signer);
-      setXmtp(client);
-      
-      // Listen for messages
-      const conversation = await client.conversations.newConversation(
-        merchantAddress
-      );
-      
-      for await (const message of conversation.streamMessages()) {
-        setMessages(prev => [...prev, message]);
-      }
-    };
-    
-    if (signer) initChat();
-  }, [signer]);
-
-  const sendMessage = async (text) => {
-    const conversation = await xmtp.conversations.newConversation(
-      merchantAddress
-    );
-    await conversation.send(text);
-  };
-
-  return (
-    <div className="encrypted-chat">
-      <div className="security-badge">
-        <Lock className="w-4 h-4" />
-        <span>End-to-End Encrypted</span>
-      </div>
-      {/* Chat UI */}
-    </div>
-  );
-};`,
-          features: [
-            "E2E encrypted message display",
-            "Security indicator badge",
-            "Message delivery confirmation",
-            "Auto-delete after delivery",
-            "Screenshot prevention (where possible)"
-          ]
-        },
-        {
-          title: "Address Reveal UI",
-          code: `const AddressReveal = ({ orderId }) => {
-  const [revealed, setRevealed] = useState(false);
-  const [decrypting, setDecrypting] = useState(false);
-
-  const revealAddress = async () => {
-    setDecrypting(true);
-    try {
-      // Request decryption from Lit Protocol
-      const decryptedAddress = await litClient.decrypt({
-        accessControlConditions,
-        ciphertext,
-        dataToEncryptHash,
-        chain: 'ethereum'
-      });
-      
-      setRevealed(decryptedAddress);
-      
-      // Log access on-chain
-      await escrowContract.requestAddressDecryption(orderId);
-    } catch (error) {
-      alert('Decryption failed: ' + error.message);
-    } finally {
-      setDecrypting(false);
+    {
+      title: "For Buyers",
+      icon: ShoppingBag,
+      benefits: [
+        "Purchase with cryptocurrency securely",
+        "Privacy-protected delivery addresses",
+        "Escrow ensures merchant accountability",
+        "Own digital proof of purchase (NFT)",
+        "Dispute resolution through smart contracts"
+      ]
     }
-  };
+  ];
 
   return (
-    <div className="address-reveal">
-      {!revealed ? (
-        <button onClick={revealAddress} disabled={decrypting}>
-          {decrypting ? 'Decrypting...' : 'Reveal Address'}
-        </button>
-      ) : (
-        <div className="revealed-address">
-          {revealed}
-          <AlertTriangle className="w-4 h-4" />
-          <span>This access was logged on-chain</span>
+    <DefaultLayout>
+      {/* Hero Section */}
+      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <ElegantShape
+            delay={0.3}
+            width={420}
+            height={105}
+            rotate={12}
+            gradient="from-indigo-500/[0.08]"
+            className="left-[-8%] top-[20%]"
+          />
+          <ElegantShape
+            delay={0.6}
+            width={320}
+            height={85}
+            rotate={-15}
+            gradient="from-purple-500/[0.08]"
+            className="right-[-6%] top-[60%]"
+          />
         </div>
-      )}
-    </div>
-  );
-};`
-        }
-      ]
-    },
-    bestPractices: {
-      title: "Security Best Practices",
-      icon: AlertTriangle,
-      content: [
-        {
-          title: "For Buyers",
-          practices: [
-            "Never share delivery address in plain text outside encrypted channels",
-            "Verify merchant's DID before revealing sensitive info",
-            "Use temporary/forwardable addresses when possible",
-            "Enable notification for any address decryption attempts",
-            "Report suspicious merchant behavior immediately"
-          ]
-        },
-        {
-          title: "For Merchants",
-          practices: [
-            "Only decrypt addresses when ready to ship",
-            "Delete plaintext addresses after shipping label created",
-            "Never store decrypted addresses in databases",
-            "Use encrypted note-taking if address must be stored temporarily",
-            "Verify order authenticity before processing"
-          ]
-        },
-        {
-          title: "Smart Contract Security",
-          practices: [
-            "Implement access control on all sensitive functions",
-            "Add rate limiting for decryption requests",
-            "Emit events for all sensitive operations",
-            "Include emergency pause functionality",
-            "Regular security audits by certified firms"
-          ]
-        },
-        {
-          title: "Communication Guidelines",
-          practices: [
-            "Use only XMTP or approved encrypted channels",
-            "Never request sensitive info through external apps",
-            "Implement auto-delete for sensitive messages",
-            "Add watermarks to prevent screenshot sharing",
-            "Require re-authentication for sensitive actions"
-          ]
-        }
-      ]
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <Shield className="w-10 h-10 text-blue-400" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              VeriMint Security Guide
-            </h1>
-          </div>
-          <p className="text-gray-400 text-lg">
-            Comprehensive security measures for merchant-buyer communication during delivery
+        
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <motion.div
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.08] mb-6"
+            {...fadeInUp}
+          >
+            <FileText className="w-4 h-4 text-indigo-400" />
+            <span className="text-sm text-white/60">How VeriMint Works</span>
+          </motion.div>
+          
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
+            Complete Platform Workflow
+          </h1>
+          
+          <p className="text-white/60 text-lg leading-relaxed max-w-3xl mx-auto">
+            Discover how VeriMint revolutionizes e-commerce with blockchain technology, 
+            providing secure, private, and decentralized product transactions.
           </p>
         </div>
+      </motion.section>
 
-        {/* Navigation */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {Object.entries(sections).map(([key, section]: [string, any]) => {
-            const Icon = section.icon;
-            return (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
-                  activeTab === key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {section.title}
-              </button>
-            );
-          })}
+      {/* Workflow Steps */}
+      <motion.section className="py-12 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <ElegantShape
+            delay={0.4}
+            width={380}
+            height={95}
+            rotate={-12}
+            gradient="from-rose-500/[0.08]"
+            className="right-[-7%] top-[15%]"
+          />
+          <ElegantShape
+            delay={0.7}
+            width={300}
+            height={80}
+            rotate={10}
+            gradient="from-violet-500/[0.08]"
+            className="left-[-5%] top-[50%]"
+          />
         </div>
+        
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+              Step-by-Step Process
+            </h2>
+            <p className="text-white/50">
+              From product creation to final delivery - complete transparency
+            </p>
+          </div>
 
-        {/* Content */}
-        <div className="space-y-6">
-          {(sections as any)[activeTab].content.map((item: any, index: number) => (
-            <div key={index} className="bg-gray-900 rounded-lg p-6 border border-gray-800">
-              {item.title && (
-                <h3 className="text-xl font-semibold mb-4 text-blue-400">
-                  {item.title}
-                </h3>
-              )}
+          <div className="space-y-8">
+            {workflowSteps.map((step, index) => {
+              const Icon = step.icon;
+              const isLast = index === workflowSteps.length - 1;
               
-              {item.description && (
-                <p className="text-gray-400 mb-4">{item.description}</p>
-              )}
+              return (
+                <motion.div
+                  key={step.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  className="relative"
+                >
+                  {/* Connecting Line */}
+                  {!isLast && (
+                    <div className="absolute left-[23px] top-[80px] w-[2px] h-[calc(100%+32px)] bg-gradient-to-b from-white/[0.15] to-transparent" />
+                  )}
 
-              {item.type === 'warning' && (
-                <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-4 mb-4">
-                  <div className="flex gap-2 mb-2">
-                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <span className="font-semibold text-red-400">Security Gaps</span>
-                  </div>
-                  <ul className="space-y-2 ml-7">
-                    {item.items.map((point: string, i: number) => (
-                      <li key={i} className="text-gray-300">{point}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {item.type === 'success' && (
-                <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4 mb-4">
-                  <div className="flex gap-2 mb-2">
-                    <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span className="font-semibold text-green-400">Solutions</span>
-                  </div>
-                  <ul className="space-y-2 ml-7">
-                    {item.items.map((point: string, i: number) => (
-                      <li key={i} className="text-gray-300">{point}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {item.code && (
-                <div className="relative">
-                  <button
-                    onClick={() => copyToClipboard(item.code, index)}
-                    className="absolute top-2 right-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors"
-                  >
-                    {copiedIndex === index ? (
-                      <Check className="w-4 h-4 text-green-400" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                  <pre className="bg-gray-950 p-4 rounded-lg overflow-x-auto text-sm border border-gray-800 mb-4">
-                    <code className="text-gray-300">{item.code}</code>
-                  </pre>
-                </div>
-              )}
-
-              {item.benefits && (
-                <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold mb-2 text-purple-400">Benefits:</h4>
-                  <ul className="space-y-1">
-                    {item.benefits.map((benefit: string, i: number) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-300 text-sm">{benefit}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {item.implementation && (
-                <div className="space-y-2">
-                  {item.implementation.map((step: string, i: number) => (
-                    <div key={i} className="flex items-start gap-2 text-gray-300">
-                      <span className="text-blue-400 font-semibold">•</span>
-                      <span>{step}</span>
+                  <div className="flex gap-6">
+                    {/* Icon Column */}
+                    <div className="flex-shrink-0">
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-${step.color}-500/20 to-${step.color}-500/5 border border-${step.color}-500/30 flex items-center justify-center relative z-10`}>
+                        <Icon className={`w-6 h-6 text-${step.color}-400`} strokeWidth={1.5} />
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
 
-              {item.steps && (
-                <ol className="space-y-3">
-                  {item.steps.map((step: string, i: number) => (
-                    <li key={i} className="flex gap-3">
-                      <span className="flex-shrink-0 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-sm font-semibold">
-                        {i + 1}
-                      </span>
-                      <span className="text-gray-300 pt-0.5">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
+                    {/* Content Column */}
+                    <div className="flex-1 pb-8">
+                      <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 hover:border-white/[0.12] transition-all duration-300">
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
+                              {step.phase}
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">
+                              {step.title}
+                            </h3>
+                          </div>
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.08] text-sm font-bold text-white/60">
+                            {step.id}
+                          </div>
+                        </div>
 
-              {item.security && (
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <h4 className="font-semibold mb-2 text-blue-400 flex items-center gap-2">
-                    <Lock className="w-4 h-4" />
-                    Security Features:
-                  </h4>
-                  <ul className="space-y-1">
-                    {item.security.map((feature: string, i: number) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="text-blue-400">→</span>
-                        <span className="text-gray-300 text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                        {/* Steps List */}
+                        <div className="space-y-2 mb-4">
+                          {step.steps.map((item, idx) => (
+                            <div key={idx} className="flex items-start gap-3">
+                              <ArrowRight className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-white/60 text-sm">{item}</span>
+                            </div>
+                          ))}
+                        </div>
 
-              {item.features && (
-                <ul className="space-y-2">
-                  {item.features.map((feature: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-300">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {item.practices && (
-                <ul className="space-y-2">
-                  {item.practices.map((practice: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="text-blue-400 font-bold flex-shrink-0 mt-1">✓</span>
-                      <span className="text-gray-300">{practice}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+                        {/* Technologies */}
+                        <div className="flex flex-wrap gap-2">
+                          {step.techs.map((tech, idx) => (
+                            <span
+                              key={idx}
+                              className="px-3 py-1 text-xs rounded-full bg-white/[0.03] border border-white/[0.08] text-white/60"
+                            >
+                              {tech}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
+      </motion.section>
 
-        {/* Footer */}
-        <div className="mt-8 p-6 bg-blue-900/20 border border-blue-700/50 rounded-lg">
-          <div className="flex gap-3 items-start">
-            <Shield className="w-6 h-6 text-blue-400 flex-shrink-0 mt-1" />
-            <div>
-              <h4 className="font-semibold text-blue-400 mb-2">Next Steps</h4>
-              <p className="text-gray-300 mb-3">
-                Implement these security measures progressively, starting with XMTP messaging and Lit Protocol encryption. 
-                Each layer adds significant protection while maintaining decentralization.
-              </p>
-              <div className="flex gap-4 text-sm">
-                <a href="https://xmtp.org/docs" target="_blank" rel="noopener noreferrer" 
-                   className="flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                  XMTP Docs <ExternalLink className="w-3 h-3" />
-                </a>
-                <a href="https://developer.litprotocol.com" target="_blank" rel="noopener noreferrer"
-                   className="flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                  Lit Protocol <ExternalLink className="w-3 h-3" />
-                </a>
-                <a href="https://developers.ceramic.network" target="_blank" rel="noopener noreferrer"
-                   className="flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                  Ceramic Network <ExternalLink className="w-3 h-3" />
-                </a>
+      {/* Security Features */}
+      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <ElegantShape
+            delay={0.5}
+            width={350}
+            height={90}
+            rotate={15}
+            gradient="from-pink-500/[0.08]"
+            className="left-[-6%] top-[30%]"
+          />
+          <ElegantShape
+            delay={0.8}
+            width={280}
+            height={75}
+            rotate={-18}
+            gradient="from-rose-500/[0.08]"
+            className="right-[-5%] bottom-[20%]"
+          />
+        </div>
+        
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+              Security & Privacy First
+            </h2>
+            <p className="text-white/50">
+              Multiple layers of protection ensure safe transactions
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {securityFeatures.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 h-full hover:border-white/[0.12] transition-all duration-300">
+                    <div className="flex gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-5 h-5 text-rose-400" strokeWidth={1.5} />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-white mb-2">
+                          {feature.title}
+                        </h3>
+                        <p className="text-white/50 text-sm">
+                          {feature.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Roles Benefits */}
+      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <ElegantShape
+            delay={0.6}
+            width={340}
+            height={88}
+            rotate={-10}
+            gradient="from-indigo-500/[0.08]"
+            className="left-[-7%] top-[25%]"
+          />
+          <ElegantShape
+            delay={0.9}
+            width={260}
+            height={70}
+            rotate={12}
+            gradient="from-purple-500/[0.08]"
+            className="right-[-6%] top-[60%]"
+          />
+        </div>
+        
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {roles.map((role, index) => {
+              const Icon = role.icon;
+              return (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, x: index === 0 ? -20 : 20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-8 h-full hover:border-white/[0.12] transition-all duration-300">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 flex items-center justify-center">
+                        <Icon className="w-6 h-6 text-indigo-400" strokeWidth={1.5} />
+                      </div>
+                      <h3 className="text-2xl font-bold text-white">
+                        {role.title}
+                      </h3>
+                    </div>
+
+                    <div className="space-y-3">
+                      {role.benefits.map((benefit, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                          <span className="text-white/60 text-sm">{benefit}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Technical Stack */}
+      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <ElegantShape
+            delay={0.7}
+            width={300}
+            height={80}
+            rotate={-14}
+            gradient="from-indigo-500/[0.08]"
+            className="right-[-8%] top-[35%]"
+          />
+        </div>
+        
+        <div className="max-w-4xl mx-auto relative z-10">
+          <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-8">
+            <div className="flex items-start gap-4 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-6 h-6 text-indigo-400" strokeWidth={1.5} />
               </div>
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  Powered by Cutting-Edge Technology
+                </h3>
+                <p className="text-white/50 text-sm">
+                  VeriMint leverages the best blockchain technologies for security, privacy, and decentralization
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                "Ethereum Blockchain",
+                "ERC-1155 Standard",
+                "Lit Protocol",
+                "IPFS Storage",
+                "Solidity Smart Contracts",
+                "Web3 Integration"
+              ].map((tech, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 px-4 py-3 bg-white/[0.02] border border-white/[0.06] rounded-xl hover:border-white/[0.12] transition-all"
+                >
+                  <div className="w-2 h-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" />
+                  <span className="text-white/70 text-sm font-medium">{tech}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
+      </motion.section>
 
-export default SecurityGuide;
+      {/* CTA */}
+      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <ElegantShape
+            delay={0.8}
+            width={320}
+            height={85}
+            rotate={16}
+            gradient="from-pink-500/[0.08]"
+            className="left-[-6%] top-[30%]"
+          />
+          <ElegantShape
+            delay={1.0}
+            width={240}
+            height={65}
+            rotate={-20}
+            gradient="from-purple-500/[0.08]"
+            className="right-[-7%] bottom-[25%]"
+          />
+        </div>
+        
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-3xl p-12">
+            <AlertCircle className="w-16 h-16 text-indigo-400 mx-auto mb-6" />
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+              Ready to Experience the Future?
+            </h2>
+            <p className="text-white/60 mb-8 max-w-2xl mx-auto">
+              Join VeriMint today and be part of the decentralized commerce revolution
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a
+                href="/product"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all"
+              >
+                Browse Products
+                <ArrowRight className="w-4 h-4" />
+              </a>
+              <a
+                href="/merchant"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white/[0.03] border border-white/[0.08] text-white font-medium rounded-lg hover:bg-white/[0.06] hover:border-white/[0.12] transition-all"
+              >
+                Start Selling
+              </a>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+    </DefaultLayout>
+  );
+}

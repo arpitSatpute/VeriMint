@@ -194,9 +194,12 @@ const DocsPage = () => {
     <DefaultLayout>
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-12">
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-purple-300 mb-4">
-            VeriMint Documentation
-          </h1>
+          <div className="flex items-center gap-4 mb-4">
+            <img src="/verimint-logo.svg" alt="VeriMint Logo" className="w-16 h-16" />
+            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-purple-300">
+              VeriMint Documentation
+            </h1>
+          </div>
           <p className="text-lg text-white/70">
             Complete guide to using the VeriMint decentralized marketplace
           </p>

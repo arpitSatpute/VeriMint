@@ -25,12 +25,14 @@ export const Navbar = ({
     <nav className="fixed top-0 w-full px-6 py-4 z-50 bg-black/40 backdrop-blur-md border-b border-gray-800">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         {/* Logo Section */}
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg bg-gray-800/60 backdrop-blur-md border border-gray-700 flex items-center justify-center">
-            <span className="text-sm font-bold text-white">{logo.initials}</span>
-          </div>
-          <span className="text-lg font-semibold text-white">{logo.name}</span>
-        </div>
+        <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+          <img 
+            src="/verimint-logo.svg" 
+            alt="VeriMint Logo" 
+            className="w-10 h-10"
+          />
+          <span className="text-xl font-bold text-white tracking-tight">{logo.name}</span>
+        </Link>
 
         {/* Navigation Links - Desktop */}
         <div className="hidden md:flex items-center space-x-8">

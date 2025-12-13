@@ -16,6 +16,7 @@ import ProductDetails from "./pages/ProductDetails";
 import Merchant from "./pages/Merchant";
 import DeliveryPage from "./pages/Delivery";
 import DecryptPage from "./pages/DecryptPage";
+import InfoPage from "./pages/info";
 
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ function App() {
             <Route element={<ProductDetails />} path="/productDetails/:id" />
             <Route element={<DeliveryPage />} path="/delivery/:orderId" />
             <Route element={<DecryptPage />} path="/decrypt/:orderId" />
+            <Route element={<InfoPage />} path="/info" />
           </Routes>
         </QueryClientProvider>
       </ThirdwebProvider>

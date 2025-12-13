@@ -70,7 +70,7 @@ function ElegantShape({
 }
 
 export default function HeroGeometric({
-  badge = "21st.dev",
+  badge = "Decentralized E-Commerce",
   title1 = "Elevate Your",
   title2 = "Digital Vision",
 }: {
@@ -151,7 +151,7 @@ export default function HeroGeometric({
             animate="visible"
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] mb-8 md:mb-12"
           >
-            <img src="https://kokonutui.com/logo.svg" alt="VeriMint" width={20} height={20} className="w-[20px] h-[20px] object-contain" />
+            <img src="/verimint-logo.svg" alt="VeriMint" width={24} height={24} className="w-[24px] h-[24px] object-contain" />
             <span className="text-sm text-white/60 tracking-wide">{badge}</span>
           </motion.div>
 
