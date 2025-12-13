@@ -91,6 +91,17 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
         }
     }
 
+    function removeMerchantProduct(address merchant, uint256 tokenId) internal {
+        uint256 len = merchantProducts[merchant].length;
+        for (uint256 i = 0; i < len; i++) {
+            if (merchantProducts[merchant][i] == tokenId) {
+                merchantProducts[merchant][i] = merchantProducts[merchant][len - 1];
+                merchantProducts[merchant].pop();
+                break;
+            }
+        }
+    }
+
     function getAllListedProducts() 
         external 
         view 
@@ -162,5 +173,10 @@ contract ProductNFT is ERC1155, Ownable, IProductNFT {
     ) external {
         require(msg.sender == escrowAddress, "Only escrow");
         _safeTransferFrom(from, to, tokenId, amount, data);
+        
+        // Check if merchant has 0 balance after transfer (all supply exhausted)
+        if (balanceOf(from, tokenId) == 0) {
+            removeMerchantProduct(from, tokenId);
+        }
     }
 }
