@@ -195,11 +195,11 @@ export default function IndexPage() {
 
       {/* Features Section */}
       <motion.section 
-        className="py-20 px-4 relative overflow-hidden bg-[#030303]"
+        className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]"
         {...fadeInUp}
       >
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.3}
             width={400}
@@ -219,15 +219,15 @@ export default function IndexPage() {
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 md:mb-16">
             <motion.h2 
-              className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent"
               {...fadeInUp}
             >
               Why Choose VeriMint?
             </motion.h2>
             <motion.p 
-              className="text-white/50 text-lg max-w-2xl mx-auto"
+              className="text-white/50 text-base md:text-lg max-w-2xl mx-auto px-4"
               {...fadeInUp}
             >
               The most secure and privacy-focused NFT marketplace for physical and virtual products
@@ -250,8 +250,8 @@ export default function IndexPage() {
                   className="group relative"
                 >
                   <div className="relative bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 h-full transition-all duration-300 hover:border-white/[0.12] hover:bg-[#0f0f0f]/50">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.gradient} bg-opacity-10 p-2.5 mb-4 flex items-center justify-center`}>
-                      <Icon className="w-6 h-6 text-white" strokeWidth={1.5} />
+                    <div className="w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center mb-4">
+                      <Icon className="w-6 h-6 text-white/70" strokeWidth={1} />
                     </div>
                     <h3 className="text-lg font-semibold text-white mb-2">
                       {feature.title}
@@ -269,11 +269,11 @@ export default function IndexPage() {
 
       {/* How It Works Section */}
       <motion.section 
-        className="py-20 px-4 relative overflow-hidden bg-[#030303]"
+        className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]"
         {...fadeInUp}
       >
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.4}
             width={420}
@@ -293,22 +293,22 @@ export default function IndexPage() {
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 md:mb-16">
             <motion.h2 
-              className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 bg-clip-text text-transparent"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-400 via-pink-400 to-rose-400 bg-clip-text text-transparent"
               {...fadeInUp}
             >
               How It Works
             </motion.h2>
             <motion.p 
-              className="text-white/50 text-lg max-w-2xl mx-auto"
+              className="text-white/50 text-base md:text-lg max-w-2xl mx-auto px-4"
               {...fadeInUp}
             >
               Simple, secure, and transparent process from listing to delivery
             </motion.p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             {howItWorks.map((item, index) => {
               const Icon = item.icon;
               return (
@@ -322,8 +322,8 @@ export default function IndexPage() {
                   transition={{ delay: index * 0.1 }}
                 >
                   <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] mb-4">
-                      <Icon className="w-6 h-6 text-indigo-400" strokeWidth={1.5} />
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-white/[0.03] border border-white/[0.08] mb-4">
+                      <Icon className="w-6 h-6 text-white/70" strokeWidth={1} />
                     </div>
                     <div className="text-5xl font-bold text-white/[0.03] mb-2 select-none">
                       {item.step}
@@ -347,11 +347,11 @@ export default function IndexPage() {
 
       {/* Security & Privacy Section */}
       <motion.section 
-        className="py-20 px-4 relative overflow-hidden bg-[#030303]"
+        className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]"
         {...fadeInUp}
       >
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.5}
             width={380}
@@ -371,15 +371,15 @@ export default function IndexPage() {
         </div>
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 md:mb-16">
             <motion.h2 
-              className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400 bg-clip-text text-transparent"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400 bg-clip-text text-transparent"
               {...fadeInUp}
             >
               Security & Privacy
             </motion.h2>
             <motion.p 
-              className="text-white/50 text-lg max-w-2xl mx-auto"
+              className="text-white/50 text-base md:text-lg max-w-2xl mx-auto px-4"
               {...fadeInUp}
             >
               Your security and privacy are our top priorities
@@ -400,8 +400,8 @@ export default function IndexPage() {
                 >
                   <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 h-full transition-all duration-300 hover:border-white/[0.12] hover:bg-[#0f0f0f]/50">
                     <div className="flex gap-4 items-start">
-                      <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-5 h-5 text-rose-400" strokeWidth={1.5} />
+                      <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-5 h-5 text-white/70" strokeWidth={1} />
                       </div>
                       <div>
                         <h3 className="text-base font-semibold text-white mb-2">
@@ -419,18 +419,18 @@ export default function IndexPage() {
           </div>
 
           <motion.div 
-            className="mt-12 p-8 rounded-2xl bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06]"
+            className="mt-8 md:mt-12 p-6 md:p-8 rounded-2xl bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06]"
             {...fadeInUp}
           >
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-4 text-center md:text-left">
                 <img 
                   src="/verimint-logo.svg" 
                   alt="VeriMint Logo" 
                   className="w-12 h-12"
                 />
                 <div>
-                  <h3 className="text-xl font-bold text-white mb-1">
+                  <h3 className="text-lg md:text-xl font-bold text-white mb-1">
                     Built on Blockchain Technology
                   </h3>
                   <p className="text-white/50 text-sm">
@@ -454,11 +454,11 @@ export default function IndexPage() {
 
       {/* CTA Section */}
       <motion.section 
-        className="py-20 px-4 relative overflow-hidden bg-[#030303]"
+        className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]"
         {...fadeInUp}
       >
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.6}
             width={350}
@@ -479,20 +479,20 @@ export default function IndexPage() {
 
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <motion.div
-            className="p-12 rounded-3xl bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06]"
+            className="p-8 md:p-12 rounded-3xl bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06]"
             {...fadeInUp}
           >
             <div className="flex justify-center mb-6">
               <img 
                 src="/verimint-logo.svg" 
                 alt="VeriMint Logo" 
-                className="w-16 h-16"
+                className="w-12 h-12 md:w-16 md:h-16"
               />
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
               Ready to Get Started?
             </h2>
-            <p className="text-white/50 text-lg mb-8 max-w-2xl mx-auto">
+            <p className="text-white/50 text-base md:text-lg mb-8 max-w-2xl mx-auto px-4">
               Join the future of decentralized commerce. Start minting and trading products securely on the blockchain.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

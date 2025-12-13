@@ -1,5 +1,5 @@
 import { Link } from "@heroui/link";
-import { Shield, FileText, BookOpen, MessageCircle, Twitter, Github } from "lucide-react";
+import { Shield, FileText, BookOpen, MessageCircle, Twitter, Github, Mail } from "lucide-react";
 
 export const Footer = () => {
   const footerLinks = {
@@ -24,6 +24,7 @@ export const Footer = () => {
   const socialLinks = [
     { icon: Twitter, href: "https://twitter.com/verimint", label: "Twitter" },
     { icon: Github, href: "https://github.com/verimint", label: "GitHub" },
+    { icon: Mail, href: "mailto:contact@verimint.com", label: "Email" },
   ];
 
   return (

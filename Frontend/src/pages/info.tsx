@@ -243,9 +243,9 @@ export default function InfoPage() {
   return (
     <DefaultLayout>
       {/* Hero Section */}
-      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.section className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.3}
             width={420}
@@ -273,11 +273,11 @@ export default function InfoPage() {
             <span className="text-sm text-white/60">How VeriMint Works</span>
           </motion.div>
           
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
             Complete Platform Workflow
           </h1>
           
-          <p className="text-white/60 text-lg leading-relaxed max-w-3xl mx-auto">
+          <p className="text-white/60 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
             Discover how VeriMint revolutionizes e-commerce with blockchain technology, 
             providing secure, private, and decentralized product transactions.
           </p>
@@ -286,8 +286,8 @@ export default function InfoPage() {
 
       {/* Workflow Steps */}
       <motion.section className="py-12 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.4}
             width={380}
@@ -307,11 +307,11 @@ export default function InfoPage() {
         </div>
         
         <div className="max-w-6xl mx-auto relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+          <div className="text-center mb-12 md:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-white">
               Step-by-Step Process
             </h2>
-            <p className="text-white/50">
+            <p className="text-white/50 text-sm md:text-base">
               From product creation to final delivery - complete transparency
             </p>
           </div>
@@ -335,27 +335,27 @@ export default function InfoPage() {
                     <div className="absolute left-[23px] top-[80px] w-[2px] h-[calc(100%+32px)] bg-gradient-to-b from-white/[0.15] to-transparent" />
                   )}
 
-                  <div className="flex gap-6">
+                  <div className="flex gap-4 md:gap-6">
                     {/* Icon Column */}
                     <div className="flex-shrink-0">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-${step.color}-500/20 to-${step.color}-500/5 border border-${step.color}-500/30 flex items-center justify-center relative z-10`}>
-                        <Icon className={`w-6 h-6 text-${step.color}-400`} strokeWidth={1.5} />
+                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-${step.color}-500/20 to-${step.color}-500/5 border border-${step.color}-500/30 flex items-center justify-center relative z-10`}>
+                        <Icon className={`w-5 h-5 md:w-6 md:h-6 text-${step.color}-400`} strokeWidth={1.5} />
                       </div>
                     </div>
 
                     {/* Content Column */}
-                    <div className="flex-1 pb-8">
-                      <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 hover:border-white/[0.12] transition-all duration-300">
+                    <div className="flex-1 pb-6 md:pb-8">
+                      <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-4 md:p-6 hover:border-white/[0.12] transition-all duration-300">
                         <div className="flex items-start justify-between mb-4">
                           <div>
                             <div className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2">
                               {step.phase}
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-2">
+                            <h3 className="text-lg md:text-xl font-bold text-white mb-2">
                               {step.title}
                             </h3>
                           </div>
-                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.08] text-sm font-bold text-white/60">
+                          <div className="flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/[0.05] border border-white/[0.08] text-xs md:text-sm font-bold text-white/60">
                             {step.id}
                           </div>
                         </div>
@@ -392,9 +392,9 @@ export default function InfoPage() {
       </motion.section>
 
       {/* Security Features */}
-      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.section className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.5}
             width={350}
@@ -415,10 +415,10 @@ export default function InfoPage() {
         
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 bg-gradient-to-r from-rose-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
               Security & Privacy First
             </h2>
-            <p className="text-white/50">
+            <p className="text-white/50 text-sm md:text-base">
               Multiple layers of protection ensure safe transactions
             </p>
           </div>
@@ -457,9 +457,9 @@ export default function InfoPage() {
       </motion.section>
 
       {/* Roles Benefits */}
-      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.section className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.6}
             width={340}
@@ -517,9 +517,9 @@ export default function InfoPage() {
       </motion.section>
 
       {/* Technical Stack */}
-      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.section className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.7}
             width={300}
@@ -531,13 +531,13 @@ export default function InfoPage() {
         </div>
         
         <div className="max-w-4xl mx-auto relative z-10">
-          <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-8">
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
-                <Zap className="w-6 h-6 text-indigo-400" strokeWidth={1.5} />
+          <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-2xl p-6 md:p-8">
+            <div className="flex flex-col md:flex-row items-start gap-4 mb-6">
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-5 h-5 md:w-6 md:h-6 text-indigo-400" strokeWidth={1.5} />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white mb-2">
+                <h3 className="text-xl md:text-2xl font-bold text-white mb-2">
                   Powered by Cutting-Edge Technology
                 </h3>
                 <p className="text-white/50 text-sm">
@@ -569,9 +569,9 @@ export default function InfoPage() {
       </motion.section>
 
       {/* CTA */}
-      <motion.section className="py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
-        {/* Elegant Shapes */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <motion.section className="py-12 md:py-20 px-4 relative overflow-hidden bg-[#030303]" {...fadeInUp}>
+        {/* Elegant Shapes - Hidden on mobile */}
+        <div className="hidden md:block absolute inset-0 overflow-hidden pointer-events-none">
           <ElegantShape
             delay={0.8}
             width={320}
@@ -591,12 +591,12 @@ export default function InfoPage() {
         </div>
         
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-3xl p-12">
-            <AlertCircle className="w-16 h-16 text-indigo-400 mx-auto mb-6" />
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+          <div className="bg-[#0a0a0a]/50 backdrop-blur-sm border border-white/[0.06] rounded-3xl p-8 md:p-12">
+            <AlertCircle className="w-12 h-12 md:w-16 md:h-16 text-indigo-400 mx-auto mb-6" />
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-white">
               Ready to Experience the Future?
             </h2>
-            <p className="text-white/60 mb-8 max-w-2xl mx-auto">
+            <p className="text-white/60 text-sm md:text-base mb-8 max-w-2xl mx-auto">
               Join VeriMint today and be part of the decentralized commerce revolution
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

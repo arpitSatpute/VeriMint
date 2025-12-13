@@ -17,6 +17,8 @@ import Merchant from "./pages/Merchant";
 import DeliveryPage from "./pages/Delivery";
 import DecryptPage from "./pages/DecryptPage";
 import InfoPage from "./pages/info";
+import ContactPage from "./pages/contact";
+import ScrollToTop from "./components/ScrollToTop";
 
 
 const queryClient = new QueryClient();
@@ -27,9 +29,11 @@ function App() {
       <div className="dark text-foreground bg-background">
       <ThirdwebProvider>
         <QueryClientProvider client={queryClient} >
+          <ScrollToTop />
           <Routes>
             <Route element={<IndexPage />} path="/" />
             <Route element={<DocsPage />} path="/docs" />
+            <Route element={<ContactPage />} path="/contact" />
             <Route element={<Merchant />} path="/merchant" />
             <Route element={<Product />} path="/product" />
             <Route element={<Order />} path="/order" />
