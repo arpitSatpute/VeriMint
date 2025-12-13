@@ -8,6 +8,7 @@ import { readContract, waitForTransactionReceipt, writeContract } from "wagmi/ac
 import { config } from "@/config/config";
 import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import ElegantShapes from "@/components/ElegantShapes";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 interface NFTMetadata {
   name: string;
@@ -205,6 +206,8 @@ function Merchant() {
   const { address } = useAccount();
   const [nfts, setNfts] = useState<MerchantNFT[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [activeView, setActiveView] = useState('all')
   const [showMintModal, setShowMintModal] = useState(false)
   const navigate = useNavigate();
@@ -498,6 +501,9 @@ function Merchant() {
     if (!nft) return;
     
     try {
+      setIsLoading(true);
+      setLoadingMessage("Listing product on marketplace...");
+      
       // 1. Write the transaction - listProduct(tokenId)
       const txHash = await writeContract(config, {
         address: PRODUCT_NFT_ADDRESS,
@@ -506,6 +512,7 @@ function Merchant() {
         args: [BigInt(nft.tokenId)],
       });
       
+      setLoadingMessage("Waiting for transaction confirmation...");
       // 2. Wait for transaction confirmation
       const receipt = await waitForTransactionReceipt(config, {
         hash: txHash,
@@ -513,13 +520,16 @@ function Merchant() {
       
       // 3. Check transaction status
       if (receipt.status === 'success') {
+        setIsLoading(false);
         alert(`NFT #${id} listed successfully!`);
         // Refresh the NFT list to update isListed status
         await loadMerchantNFTs();
       } else {
+        setIsLoading(false);
         alert('Transaction failed');
       }
     } catch (error) {
+      setIsLoading(false);
       console.error('Failed to list NFT:', error);
       alert('Failed to list NFT. Check console for details.');
     }
@@ -530,6 +540,9 @@ function Merchant() {
     if (!nft) return;
     
     try {
+      setIsLoading(true);
+      setLoadingMessage("Unlisting product from marketplace...");
+      
       const txHash = await writeContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
@@ -537,17 +550,21 @@ function Merchant() {
         args: [BigInt(nft.tokenId)],
       });
       
+      setLoadingMessage("Waiting for transaction confirmation...");
       const receipt = await waitForTransactionReceipt(config, {
         hash: txHash,
       });
       
       if (receipt.status === 'success') {
+        setIsLoading(false);
         alert(`NFT #${id} removed from listing!`);
         await loadMerchantNFTs();
       } else {
+        setIsLoading(false);
         alert('Transaction failed');
       }
     } catch (error) {
+      setIsLoading(false);
       console.error('Failed to unlist NFT:', error);
       alert('Failed to unlist NFT. Check console for details.');
     }
@@ -587,6 +604,7 @@ function Merchant() {
 
   return (
     <DefaultLayout>
+      <LoadingOverlay isVisible={isLoading} message={loadingMessage} />
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 

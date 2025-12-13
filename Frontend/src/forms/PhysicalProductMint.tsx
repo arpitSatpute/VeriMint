@@ -9,6 +9,7 @@ import { parseEther, keccak256, toBytes } from "viem";
 import DefaultLayout from "@/layouts/default";
 import { useAccount } from "wagmi";
 import { useNavigate } from "react-router-dom";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 
 type ElegantShapeProps = {
@@ -153,6 +154,8 @@ export default function PhysicalProductMint() {
   const { address } = useAccount();
 
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
   const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS;
   const navigate = useNavigate();
@@ -300,11 +303,22 @@ export default function PhysicalProductMint() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    
+    setIsLoading(true);
+    setLoadingMessage("Uploading image to IPFS...");
+    
     const img = await uploadImageToIPFS()
-    if (!img) return alert('Image upload failed')
+    if (!img) {
+      setIsLoading(false);
+      return alert('Image upload failed');
+    }
 
+    setLoadingMessage("Uploading metadata to IPFS...");
     const meta = await uploadJsonToIPFS(img.cid)
-    if (!meta) return alert('Metadata upload failed')
+    if (!meta) {
+      setIsLoading(false);
+      return alert('Metadata upload failed');
+    }
 
     console.log('Metadata CID:', meta.cid, 'URL:', meta.url)
 
@@ -312,6 +326,7 @@ export default function PhysicalProductMint() {
       // Convert "physical" to bytes32 using keccak256
       const productTypeBytes32 = keccak256(toBytes("physical"));
 
+      setLoadingMessage("Minting product NFT...");
       const txHash = await writeContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
@@ -326,8 +341,10 @@ export default function PhysicalProductMint() {
         ]
       });
 
+      setLoadingMessage("Waiting for transaction confirmation...");
       const receipt = await waitForTransactionReceipt(config, { hash: txHash });
       if (receipt.status === "success") {
+        setIsLoading(false);
         alert('Product minted successfully!');
         // Reset form
         setFormData({
@@ -346,10 +363,12 @@ export default function PhysicalProductMint() {
         });
         setImagePreview(null);
       } else {
+        setIsLoading(false);
         alert('Transaction failed');
       }
     } catch (error) {
       console.error('Minting error:', error);
+      setIsLoading(false);
       alert('Failed to mint product. Please try again.');
     }
     finally{
@@ -366,6 +385,7 @@ export default function PhysicalProductMint() {
 
   return (
     <DefaultLayout>
+      <LoadingOverlay isVisible={isLoading} message={loadingMessage} />
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 

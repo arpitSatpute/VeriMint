@@ -9,6 +9,7 @@ import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { parseEther, keccak256, toBytes } from "viem";
 import { useAccount } from "wagmi"; // ✅ Add this import
 import { Navigate, useNavigate } from "react-router-dom";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 type ElegantShapeProps = {
   className?: string;
@@ -147,6 +148,8 @@ interface FormDataType {
 export default function VirtualProductMint() {
   const { address } = useAccount(); // ✅ Get connected wallet address
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const pinataJWT = import.meta.env.VITE_PINATA_JWT;
   const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
   const navigate = useNavigate();
@@ -311,22 +314,29 @@ export default function VirtualProductMint() {
       return;
     }
 
+    setIsLoading(true);
+    setLoadingMessage("Uploading image to IPFS...");
+    
     console.log("1️⃣ Uploading image to IPFS...");
     const img = await uploadImageToIPFS()
     if (!img) {
+      setIsLoading(false);
       alert('Image upload failed')
       return;
     }
     console.log("✅ Image uploaded:", img.cid);
 
+    setLoadingMessage("Uploading metadata to IPFS...");
     console.log("2️⃣ Uploading metadata to IPFS...");
     const meta = await uploadJsonToIPFS(img.cid)
     if (!meta) {
+      setIsLoading(false);
       alert('Metadata upload failed')
       return;
     }
     console.log("✅ Metadata uploaded:", meta.cid);
 
+    setLoadingMessage("Minting NFT on blockchain...");
     console.log("3️⃣ Minting NFT on blockchain...");
     
     // Convert "virtual" to bytes32 using keccak256
@@ -355,14 +365,17 @@ export default function VirtualProductMint() {
       ]
     });
 
+    setLoadingMessage("Waiting for transaction confirmation...");
     console.log("⏳ Waiting for transaction confirmation...", txHash);
     const receipt = await waitForTransactionReceipt(config, { hash: txHash });
     
     if (receipt.status === "success") {
+      setIsLoading(false);
       console.log("✅ NFT minted successfully!");
       console.log('Virtual Product NFT minted successfully!');
       navigate('/merchant');
     } else {
+      setIsLoading(false);
       console.log("❌ Transaction failed");
       alert('Transaction failed');
     }
@@ -379,6 +392,7 @@ export default function VirtualProductMint() {
 
   return (
     <DefaultLayout>
+      <LoadingOverlay isVisible={isLoading} message={loadingMessage} />
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 

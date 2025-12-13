@@ -9,6 +9,7 @@ import escrowMultiProductAbi from "@/abis/escrowMultiProduct.json";
 import productNftAbi from "@/abis/productNft.json";
 import { keccak256, toHex, encodePacked } from "viem";
 import { useAccount } from "wagmi";
+import LoadingOverlay from "@/components/LoadingOverlay";
 import {
   encryptDeliveryAddress,
   generateDeliveryHash,
@@ -47,6 +48,8 @@ export default function CreateOrder() {
   const { address } = useAccount();
   const [nftData, setNftData] = useState<NFTDataType | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [maxSupply, setMaxSupply] = useState<number>(0);
   const [useEncryption, setUseEncryption] = useState(true);
   const [encryptionSupported, setEncryptionSupported] = useState(false);
@@ -174,6 +177,8 @@ export default function CreateOrder() {
     
     try {
       setSubmitting(true);
+      setIsLoading(true);
+      setLoadingMessage("Validating product listing...");
       console.log("🚀 Starting order creation...");
       
       const quantity = BigInt(formData.quantity);
@@ -191,9 +196,11 @@ export default function CreateOrder() {
 
       console.log("✓ Product listed:", isListed);
       if (!isListed) {
+        setIsLoading(false);
         throw new Error("Product is no longer listed");
       }
 
+      setLoadingMessage("Checking product availability...");
       // Re-check available supply before proceeding
       const currentAvailable = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
@@ -204,6 +211,7 @@ export default function CreateOrder() {
 
       console.log("✓ Available supply:", currentAvailable.toString());
       if (currentAvailable < quantity) {
+        setIsLoading(false);
         throw new Error(`Insufficient supply. Only ${currentAvailable} units available`);
       }
 
@@ -281,6 +289,7 @@ export default function CreateOrder() {
       // Check if contract supports encryption (has 6 parameters)
       const supportsEncryption = encryptedAddress !== "0x";
 
+      setLoadingMessage("Creating order on blockchain...");
       // Call fundEscrow function
       const tx = await writeContract(config, {
         address: ESCROW_MULTI_PRODUCT,
@@ -305,6 +314,7 @@ export default function CreateOrder() {
       
       console.log("⏳ Transaction sent:", tx);
       
+      setLoadingMessage("Waiting for transaction confirmation...");
       const receipt = await waitForTransactionReceipt(config, { 
         hash: tx,
         confirmations: 1,
@@ -312,6 +322,7 @@ export default function CreateOrder() {
       });
       
       if (receipt.status === "success") {
+        setIsLoading(false);
         console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
         const totalEth = (Number(totalWei) / 1e18).toFixed(4);
         
@@ -327,10 +338,12 @@ export default function CreateOrder() {
           navigate('/order');
         }, 2000);
       } else {
+        setIsLoading(false);
         throw new Error('Transaction failed');
       }
       
     } catch (err: any) {
+      setIsLoading(false);
       console.error("❌ Order creation failed:", err);
       console.error("Full error object:", JSON.stringify(err, null, 2));
       
@@ -382,6 +395,7 @@ export default function CreateOrder() {
 
   return (
     <DefaultLayout>
+      <LoadingOverlay isVisible={isLoading} message={loadingMessage} />
     <div className="relative min-h-screen w-full bg-[#030303]">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl" />
 
