@@ -83,10 +83,9 @@ Thumbs.db
 **/.deps
 .deps/**
 
-**/.states
-.states
-.states/**
+# State and workspace (ignore everywhere)
+.states/
+**/.states/
 
-**/.workspaces
-.workspaces
-.workspaces/**
+.workspaces/
+**/.workspaces/
