@@ -9,6 +9,7 @@ import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 import DefaultLayout from "@/layouts/default"
 import { useNavigate } from "react-router-dom"
 import ElegantShapes from "@/components/ElegantShapes"
+import toast from "react-hot-toast";
 
 type DeliveryStatus = 'Pending' | 'InTransit' | 'Delivered' | 'Failed'
 type OrderState = 'Created' | 'Released' | 'Cancelled'
@@ -285,7 +286,6 @@ export default function Order() {
                   break
                 }
               } catch (err) {
-                console.warn(`⚠️ Failed to fetch from ${gatewayUrl}`)
                 continue
               }
             }
@@ -388,7 +388,7 @@ export default function Order() {
             digitalAssetCid: digitalAssetCid,
           }
         } catch (err) {
-          console.error(`❌ Failed to load order ${orderId}:`, err)
+          toast.error(`❌ Failed to load order ${orderId}`)
           return null
         }
       })
@@ -398,7 +398,7 @@ export default function Order() {
       
       setOrders(validOrders)
     } catch (error) {
-      console.error("❌ Failed to load orders:", error)
+      toast.error("Failed to load orders");
     } finally {
       setLoading(false)
     }

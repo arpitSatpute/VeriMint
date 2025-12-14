@@ -217,7 +217,6 @@ export default function VirtualProductMint() {
       if (!cid) throw new Error("No IpfsHash returned from Pinata");
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err: any) {
-      console.error("IPFS upload failed:", err?.response?.data ?? err);
       return null;
     }
   }
@@ -251,7 +250,7 @@ export default function VirtualProductMint() {
       if (!cid) throw new Error("No IpfsHash returned from Pinata");
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err: any) {
-      console.error("Digital asset upload failed:", err?.response?.data ?? err);
+      toast.error("Digital asset upload failed")
       return null;
     }
   }
@@ -304,7 +303,7 @@ export default function VirtualProductMint() {
       const cid: string = res.data.IpfsHash
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
     } catch (e) {
-      console.error('❌ JSON upload failed:', e)
+      toast.error('Metadata upload failed')
       return null
     }
   }
@@ -345,7 +344,7 @@ export default function VirtualProductMint() {
     
     
     if (!address) {
-      alert('Please connect your wallet first');
+      toast.error('Please connect your wallet first');
       return;
     }
 
@@ -355,7 +354,7 @@ export default function VirtualProductMint() {
     const img = await uploadImageToIPFS()
     if (!img) {
       setIsLoading(false);
-      alert('Image upload failed')
+      toast.error('Image upload failed')
       return;
     }
 
@@ -365,7 +364,7 @@ export default function VirtualProductMint() {
       setLoadingMessage("Uploading digital asset to IPFS...");
       digitalAsset = await uploadDigitalAssetToIPFS();
       if (!digitalAsset) {
-        console.warn('⚠️ Digital asset upload failed, continuing without it');
+        toast.error('Asset upload skipped, continuing')
       } else {
       }
     }
@@ -374,7 +373,7 @@ export default function VirtualProductMint() {
     const meta = await uploadJsonToIPFS(img.cid, digitalAsset?.cid)
     if (!meta) {
       setIsLoading(false);
-      alert('Metadata upload failed')
+      toast.error('Metadata upload failed')
       return;
     }
 
@@ -403,6 +402,7 @@ export default function VirtualProductMint() {
     
     if (receipt.status === "success") {
       setIsLoading(false);
+      toast.success('Virtual product minted successfully');
       navigate('/merchant');
     } else {
       setIsLoading(false);

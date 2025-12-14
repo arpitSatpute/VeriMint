@@ -112,7 +112,7 @@ export default function CreateOrder() {
 
       setMaxSupply(Number(available));
     } catch (error) {
-      console.error("Failed to fetch available supply:", error);
+      toast.error("Failed to fetch available supply")
       setMaxSupply(0);
     }
   };
@@ -259,7 +259,7 @@ export default function CreateOrder() {
             dataToEncryptHash = formatted.dataToEncryptHash;
 
           } catch (encryptError: any) {
-            console.error("⚠️ Encryption failed, falling back to hash only:", encryptError);
+            toast.error("Encryption failed, using hash only")
             alert(`⚠️ Encryption failed: ${encryptError?.message || "Unknown error"}\n\nContinuing with unencrypted order...`);
             // Continue with just hash if encryption fails
           }
@@ -312,21 +312,7 @@ export default function CreateOrder() {
         setIsLoading(false);
         const totalEth = (Number(totalWei) / 1e18).toFixed(4);
         
-        let successMessage = `✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalEth} ETH\nQuantity: ${quantity}`;
-        
-        if (supportsEncryption) {
-          successMessage += "\n\n🔐 Delivery address encrypted with Lit Protocol\n✓ Merchant can only decrypt after order is funded";
-        }
-        
-        // Check if auto-completed
-        const isAutoCompleted = nftData.type === "virtual" || !formData.needsShipping;
-        if (isAutoCompleted) {
-          successMessage += nftData.type === "virtual" 
-            ? "\n\n🎨 Virtual product - Funds released instantly!\n✓ Your order is complete" 
-            : "\n\n📦 No shipping required - Funds released!\n✓ Order completed";
-        }
-        
-        alert(successMessage + "\n\nRedirecting to orders page...");
+        toast.success(`Order placed! ${quantity} item(s) for ${totalEth} ETH`);
         
         setTimeout(() => {
           navigate('/order');
@@ -338,8 +324,6 @@ export default function CreateOrder() {
       
     } catch (err: any) {
       setIsLoading(false);
-      console.error("❌ Order creation failed:", err);
-      console.error("Full error object:", JSON.stringify(err, null, 2));
       
       let errorMessage = "Unknown error";
       

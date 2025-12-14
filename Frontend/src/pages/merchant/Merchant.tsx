@@ -307,7 +307,6 @@ function Merchant() {
 
             // Validate URI exists before constructing metadata URL
             if (!uri || uri.trim() === "") {
-              console.warn(`Token ${tid} - No valid URI found, skipping metadata fetch`);
               throw new Error(`Token ${tid} has no metadata URI`);
             }
 
@@ -380,13 +379,12 @@ function Merchant() {
                   break;
                 }
               } catch (err) {
-                console.warn(`Token ${tid} - Failed to fetch from ${gatewayUrl}:`, err);
                 continue;
               }
             }
 
             if (!fetchSuccess) {
-              console.warn(`Token ${tid} - Could not fetch metadata from any gateway, using contract data`);
+              // Could not fetch metadata from any gateway, using contract data
             }
 
             // Fetch image using URL from metadata with gateway fallback
@@ -424,17 +422,14 @@ function Merchant() {
                       break;
                     }
                   } catch (imgErr) {
-                    console.warn(`Token ${tid} - Failed to fetch image from ${imgGatewayUrl}`);
                     continue;
                   }
                 }
                 
                 if (!imageFetchSuccess) {
-                  console.warn(`Token ${tid} - Could not fetch image from any gateway`);
                   imageUrl = "/placeholder.png";
                 }
               } catch (imgErr) {
-                console.warn(`Token ${tid} - Image fetch error:`, imgErr);
                 imageUrl = "/placeholder.png";
               }
             }
@@ -478,7 +473,7 @@ function Merchant() {
               attributes: metadata.attributes,
             };
           } catch (err) {
-            console.error(`Failed to load product ${tid}:`, err);
+            toast.error(`Failed to load product ${tid}`)
             return null;
           }
         })
@@ -486,14 +481,14 @@ function Merchant() {
 
       setNfts(nftData.filter((n) => n !== null) as MerchantNFT[]);
     } catch (error) {
-      console.error("Failed to load merchant NFTs:", error);
+      toast.error("Failed to load NFTs")
     } finally {
       setLoading(false);
     }
   };
 
   const handleBurn = (id: number) => {
-    alert(`Burn confirmation for NFT ${id}`)
+    toast.error(`Burn confirmation for NFT ${id}`)
   }
 
   const handleList = async (id: number) => {
@@ -530,7 +525,6 @@ function Merchant() {
       }
     } catch (error) {
       setIsLoading(false);
-      console.error('Failed to list NFT:', error);
       toast.error('Failed to list product');
     }
   }
@@ -565,7 +559,6 @@ function Merchant() {
       }
     } catch (error) {
       setIsLoading(false);
-      console.error('Failed to unlist NFT:', error);
       toast.error('Failed to unlist product');
     }
   }

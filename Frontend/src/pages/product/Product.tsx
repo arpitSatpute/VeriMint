@@ -7,6 +7,7 @@ import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { readContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import ElegantShapes from "@/components/ElegantShapes";
+import toast from "react-hot-toast";
 
 interface NFTMetadata {
   name: string;
@@ -188,7 +189,7 @@ export default function Product() {
             const product = products[idx];
 
             if (!product) {
-              console.warn(`⚠️ No product data for token ${tid}`);
+              // toast.error(`No data available for token ${tid}`)
               return null;
             }
 
@@ -249,13 +250,12 @@ export default function Product() {
                   break;
                 }
               } catch (err) {
-                console.warn(`Token ${tid} - Failed to fetch from ${gatewayUrl}`);
                 continue;
               }
             }
 
             if (!fetchSuccess) {
-              console.warn(`Token ${tid} - Could not fetch metadata from any gateway`);
+              // Could not fetch metadata from any gateway
             }
 
             // Fetch image using URL from metadata with gateway fallback
@@ -293,17 +293,14 @@ export default function Product() {
                       break;
                     }
                   } catch (imgErr) {
-                    console.warn(`Token ${tid} - Failed to fetch image from ${imgGatewayUrl}`);
                     continue;
                   }
                 }
                 
                 if (!imageFetchSuccess) {
-                  console.warn(`Token ${tid} - Could not fetch image from any gateway`);
                   imageUrl = "/placeholder.png";
                 }
               } catch (imgErr) {
-                console.warn(`Token ${tid} - Image fetch error:`, imgErr);
                 imageUrl = "/placeholder.png";
               }
             }
@@ -345,7 +342,7 @@ export default function Product() {
               attributes: metadata.attributes || [],
             };
           } catch (err) {
-            console.error(`❌ Failed to process token ${tid}:`, err);
+            toast.error(`Failed to load token ${tid}`)
             return null;
           }
         })
@@ -354,7 +351,7 @@ export default function Product() {
       const validNfts = nftData.filter((n) => n !== null) as ListedNFT[];
       setNfts(validNfts);
     } catch (error) {
-      console.error("❌ Failed to load listed NFTs:", error);
+      toast.error("Failed to load products")
       alert("Failed to load products. Check console for details.");
     } finally {
       setLoading(false);

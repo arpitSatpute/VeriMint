@@ -126,7 +126,7 @@ export default function DeliveryPage() {
       // Silently ignore "No encrypted data" or authorization errors for non-encrypted orders
       const errorMsg = error?.message || ""
       if (!errorMsg.includes("No encrypted data") && !errorMsg.includes("Not authorized")) {
-        console.error("❌ [Delivery Page] Failed to fetch decryption deadline:", error)
+        toast.error("Failed to fetch decryption deadline")
       } else {
       }
     }
@@ -280,8 +280,7 @@ export default function DeliveryPage() {
       setOrder(orderDetails)
       setIsMerchant(address?.toLowerCase() === orderDetails.merchantAddress?.toLowerCase())
     } catch (error) {
-      console.error("❌ [Delivery Page] Failed to load order:", error)
-      alert("Failed to load order details")
+      toast.error("Failed to load order")
     } finally {
       setLoading(false)
     }
@@ -307,12 +306,12 @@ export default function DeliveryPage() {
     
     // Validate: Can only update if physical product and not completed/cancelled
     if (order.type !== "physical") {
-      alert("Only physical products can have delivery status updates")
+      toast.error("Only physical products can have delivery status updates")
       return
     }
     
     if (order.orderState !== 0) {
-      alert("Cannot update status for completed or cancelled orders")
+      toast.error("Cannot update status for completed or cancelled orders")
       return
     }
     
@@ -333,7 +332,7 @@ export default function DeliveryPage() {
       toast.success("Status updated successfully")
       await loadOrderDetails()
     } catch (error: any) {
-      console.error("Failed to update status:", error)
+      toast.error("Failed to update status")
       const errorMsg = error?.message || error?.shortMessage || "Unknown error"
       toast.error(`Failed to update status: ${errorMsg}`)
     } finally {
@@ -346,17 +345,17 @@ export default function DeliveryPage() {
     
     // Validate: Must be buyer, physical product, and status must be InTransit (1)
     if (order.type !== "physical") {
-      alert("Only physical products require delivery confirmation")
+      toast.error("Physical products only for delivery confirmation")
       return
     }
     
     if (order.deliveryStatus !== 1) {
-      alert("Delivery can only be confirmed when order is In Transit")
+      toast.error("Confirm when order is in transit")
       return
     }
     
     if (order.orderState !== 0) {
-      alert("Cannot confirm delivery for completed or cancelled orders")
+      toast.error("Cannot confirm completed or cancelled orders")
       return
     }
     
@@ -377,7 +376,7 @@ export default function DeliveryPage() {
       toast.success("Delivery confirmed! Funds released to merchant")
       await loadOrderDetails()
     } catch (error: any) {
-      console.error("Failed to confirm delivery:", error)
+      toast.error("Failed to confirm delivery")
       const errorMsg = error?.message || error?.shortMessage || "Unknown error"
       toast.error(`Failed to confirm delivery: ${errorMsg}`)
     } finally {
@@ -406,7 +405,7 @@ export default function DeliveryPage() {
       toast.success("Order refunded successfully")
       await loadOrderDetails()
     } catch (error: any) {
-      console.error("Failed to refund:", error)
+      toast.error("Failed to refund")
       toast.error(`Refund failed: ${error?.message || "Unknown error"}`)
     } finally {
       setUpdating(false)
@@ -417,7 +416,7 @@ export default function DeliveryPage() {
     if (!order || isMerchant) return
     
     if (!deadlineExpired) {
-      alert("Decryption deadline has not expired yet.")
+      toast.error("Decryption deadline not expired yet")
       return
     }
 
@@ -442,7 +441,7 @@ export default function DeliveryPage() {
       toast.success("Refund claimed! Funds returned to wallet")
       await loadOrderDetails()
     } catch (error: any) {
-      console.error("Failed to claim refund:", error)
+      toast.error("Failed to claim refund")
       const errorMsg = error?.message || error?.shortMessage || "Unknown error"
       toast.error(`Failed to claim refund: ${errorMsg}`)
     } finally {
@@ -455,13 +454,13 @@ export default function DeliveryPage() {
     
     
     if (isMerchant) {
-      alert("Only buyers can download the digital asset")
+      toast.error("Only buyers can download the digital asset")
       return
     }
     
     // Check if delivery is completed
     if (order.deliveryStatus !== 2) {
-      alert("Digital asset will be available after delivery is completed")
+      toast.error("Digital asset will be available after delivery is completed")
       return
     }
 
@@ -601,8 +600,8 @@ export default function DeliveryPage() {
       document.body.removeChild(a)
       
     } catch (error: any) {
-      console.error("Failed to download:", error)
-      alert(`❌ Failed to download digital asset:\n${error?.message || "Unknown error"}`)
+      toast.error("Failed to download digital asset")
+      alert(`Failed to download digital asset:\n${error?.message || "Unknown error"}`)
     } finally {
       setDownloading(false)
     }

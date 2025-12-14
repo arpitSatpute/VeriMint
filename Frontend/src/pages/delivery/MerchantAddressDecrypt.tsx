@@ -142,7 +142,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
           [buyerAddress, merchantAddress] = orderDetailsRaw;
         }
       } catch (getDetailsError: any) {
-        console.warn("⚠️ getOrderDetails failed, trying direct mapping access:", getDetailsError.message);
+        toast.error("Failed to load order details")
       }
 
       // Method 2: Fallback to direct mapping access if above methods failed
@@ -161,15 +161,14 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
             merchantAddress = (detailsRaw as any).merchant || (detailsRaw as any)[1];
           }
         } catch (detailsError) {
-          console.warn("⚠️ details mapping also failed:", detailsError);
+          // Fallback error handling
         }
       }
 
       // Final validation
 
       if (!merchantAddress || !buyerAddress) {
-        console.error(" Could not extract addresses from any method");
-        console.error("   Raw response was:", orderDetailsRaw);
+        toast.error("Could not load address information")
         throw new Error(
           "Could not retrieve valid order details. Order may not exist or contract ABI may be incompatible."
         );
@@ -237,17 +236,11 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
           timestamp: Number(log[1]),
         });
       } catch (logError) {
-        console.warn("Could not fetch decryption log:", logError);
+        // Decryption log not available
       }
 
     } catch (error: any) {
-      console.error(" Failed to load encrypted data:", error);
-      console.error("   Full error details:", {
-        message: error.message,
-        cause: error.cause,
-        stack: error.stack?.split('\n').slice(0, 3).join('\n')
-      });
-      
+      toast.error("Failed to load encrypted data")
       let errorMessage = "Failed to load encrypted data";
       
       if (error.message?.includes("Could not retrieve valid order details")) {
@@ -298,8 +291,9 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
             gas: 200000n,
           });
           await waitForTransactionReceipt(config, { hash: requestTx });
+          toast.success('Access logged successfully');
         } catch (logError) {
-          console.warn("⚠️ Could not log on-chain (skipping in mock mode):", logError);
+          toast.error("Access log skipped")
         }
 
         // Step 2: Use mock decryption
@@ -309,6 +303,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
         const decrypted = await mockDecryptDeliveryAddress(orderId, address);
         
         setDecryptedAddress(decrypted);
+        toast.success('Address decrypted successfully');
         await loadEncryptedData();
         return;
       }
@@ -325,6 +320,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       });
 
       await waitForTransactionReceipt(config, { hash: requestTx });
+      toast.success('Decryption request logged');
 
       // Step 2: Get encrypted data from contract
       const encryptedData = await readContract(config, {
@@ -364,18 +360,12 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       }
 
       setDecryptedAddress(decrypted);
+      toast.success('Address decrypted successfully');
       
       // Reload to show access log
       await loadEncryptedData();
 
     } catch (error: any) {
-      console.error(" Decryption failed:", error);
-      console.error("   Full error object:", {
-        message: error?.message,
-        name: error?.name,
-        cause: error?.cause,
-        stack: error?.stack?.split('\n').slice(0, 5).join('\n')
-      });
       
       let errorMessage = "Failed to decrypt address";
       
@@ -399,6 +389,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       }
       
       setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setDecrypting(false);
     }

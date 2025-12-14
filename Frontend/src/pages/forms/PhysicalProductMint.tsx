@@ -221,7 +221,6 @@ export default function PhysicalProductMint() {
       const cid: string = response.data?.IpfsHash;
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err) {
-      console.error("IPFS upload failed:", err);
       return null;
     }
   };
@@ -273,7 +272,7 @@ export default function PhysicalProductMint() {
       const cid = res.data.IpfsHash
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
     } catch (e) {
-      console.error('JSON upload failed:', e)
+      toast.error('Metadata upload failed')
       return null
     }
   }
@@ -309,14 +308,14 @@ export default function PhysicalProductMint() {
     const img = await uploadImageToIPFS()
     if (!img) {
       setIsLoading(false);
-      return alert('Image upload failed');
+      return toast.error('Image upload failed');
     }
 
     setLoadingMessage("Uploading metadata to IPFS...");
     const meta = await uploadJsonToIPFS(img.cid)
     if (!meta) {
       setIsLoading(false);
-      return alert('Metadata upload failed');
+      return toast.error('Metadata upload failed');
     }
 
 
@@ -365,7 +364,7 @@ export default function PhysicalProductMint() {
         toast.error('Minting failed');
       }
     } catch (error) {
-      console.error('Minting error:', error);
+      toast.error('Minting error');
       setIsLoading(false);
       toast.error('Minting failed. Please try again');
     }

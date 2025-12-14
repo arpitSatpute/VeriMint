@@ -5,6 +5,7 @@ import { ShoppingCart, Heart, Share2, Package, Hash, Tag, User, Eye } from "luci
 import DefaultLayout from "@/layouts/default"
 import { useAccount } from "wagmi"
 import ElegantShapes from "@/components/ElegantShapes"
+import toast from "react-hot-toast"
 
 interface DetailRowProps {
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -65,7 +66,7 @@ export default function ProductDetails() {
         setIsMerchantView(true);
       }
     } else {
-      console.warn("⚠️ No product data passed from previous page");
+      toast.error("Product data not available")
     }
 
     return () => {};
