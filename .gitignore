@@ -78,3 +78,15 @@ Thumbs.db
 .LSOverride
 
 **/broadcast/
+
+.deps
+**/.deps
+.deps/**
+
+**/.states
+.states
+.states/**
+
+**/.workspaces
+.workspaces
+.workspaces/**
