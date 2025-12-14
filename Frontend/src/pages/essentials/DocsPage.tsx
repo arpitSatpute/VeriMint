@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Lock, Package, ShoppingCart, Truck, Eye, FileText, 
   CheckCircle, AlertTriangle, Users, Store, Zap, Key,
@@ -32,6 +32,7 @@ interface FeatureCardProps {
 const DocsPage = () => {
   const [activeSection, setActiveSection] = useState('overview');
   const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   const sections = [
     { id: 'overview', label: 'Overview', icon: BookOpen },
@@ -41,6 +42,64 @@ const DocsPage = () => {
     { id: 'buyers', label: 'For Buyers', icon: ShoppingCart },
     { id: 'security', label: 'Security & Privacy', icon: Shield },
   ];
+
+  // Real-time section tracking on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 150;
+
+      for (const section of sections) {
+        const element = document.getElementById(section.id);
+        if (element) {
+          const { offsetTop, offsetHeight } = element;
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            setActiveSection(section.id);
+            break;
+          }
+        }
+      }
+    };
+
+    // Initial check
+    handleScroll();
+
+    // Add scroll listener
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Intersection Observer as backup for better accuracy
+    const observerOptions = {
+      root: null,
+      rootMargin: '-100px 0px -66% 0px',
+      threshold: [0, 0.25, 0.5, 0.75, 1.0],
+    };
+
+    observerRef.current = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.25) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    }, observerOptions);
+
+    // Observe all sections
+    const timeoutId = setTimeout(() => {
+      sections.forEach((section) => {
+        const element = document.getElementById(section.id);
+        if (element && observerRef.current) {
+          observerRef.current.observe(element);
+        }
+      });
+    }, 100);
+
+    // Cleanup
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('scroll', handleScroll);
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []);
 
   const features = [
     {
