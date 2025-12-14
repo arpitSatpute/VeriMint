@@ -396,7 +396,7 @@ export default function Order() {
       })
 
       const resolvedOrders = await Promise.all(orderPromises)
-      const validOrders = resolvedOrders.filter((o): o is OrderType => o !== null)
+      const validOrders = resolvedOrders.filter((o) => o !== null) as OrderType[]
       
       setOrders(validOrders)
     } catch (error) {
