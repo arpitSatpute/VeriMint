@@ -233,8 +233,8 @@ export default function PhysicalProductMint() {
         name: formData.name || 'Product',
         description: formData.description || '',
 
-        // FIX (IMPORTANT)
-        image: `https://gateway.pinata.cloud/ipfs/${imageCid}`,
+        // FIX (IMPORTANT) - Store image CID in ipfs:// format
+        image: `ipfs://${imageCid}`,
 
         attributes: [
           { trait_type: 'Type', value: 'physical' },
@@ -270,7 +270,7 @@ export default function PhysicalProductMint() {
       )
 
       const cid = res.data.IpfsHash
-      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
+      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
     } catch (e) {
       toast.error('Metadata upload failed')
       return null

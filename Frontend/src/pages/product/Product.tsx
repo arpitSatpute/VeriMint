@@ -8,6 +8,7 @@ import { readContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import ElegantShapes from "@/components/ElegantShapes";
 import toast from "react-hot-toast";
+import { extractCIDFromURI, getIPFSGatewayURLs } from "@/lib/utils";
 
 interface NFTMetadata {
   name: string;
@@ -264,20 +265,11 @@ export default function Product() {
             
             if (imageSource && imageSource !== "/placeholder.png") {
               try {
-                // Extract CID from image source
-                let imageCid = imageSource;
-                if (imageSource.startsWith("ipfs://")) {
-                  imageCid = imageSource.replace("ipfs://", "");
-                } else if (imageSource.includes("ipfs/")) {
-                  imageCid = imageSource.split("ipfs/").pop() || imageSource;
-                }
+                // Extract CID from image source (handles ipfs://, http, and raw CID)
+                const imageCid = extractCIDFromURI(imageSource);
                 
-                // Priority: Custom Pinata → IPFS.io → IPFS.io fallback
-                const imageGateways = [
-                  `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`, // Primary
-                  `https://ipfs.io/ipfs/${imageCid}`, // Secondary
-                  imageSource.startsWith("http") ? imageSource : `https://ipfs.io/ipfs/${imageCid}`, // Fallback
-                ];
+                // Get list of gateway URLs to try (in order of preference)
+                const imageGateways = getIPFSGatewayURLs(imageCid);
                 
                 let imageFetchSuccess = false;
                 for (const imgGatewayUrl of imageGateways) {

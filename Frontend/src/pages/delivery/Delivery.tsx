@@ -13,6 +13,7 @@ import ESCROW_ABI from "@/abis/escrowMultiProduct.json"
 import ORDER_MANAGER_ABI from "@/abis/orderManager.json"
 import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 import { keccak256, encodePacked } from "viem"
+import { extractCIDFromURI, getIPFSGatewayURLs } from "@/lib/utils"
 import DefaultLayout from "@/layouts/default"
 import ElegantShapes from "@/components/ElegantShapes"
 import toast from "react-hot-toast"
@@ -202,20 +203,34 @@ export default function DeliveryPage() {
       let imageUrl = "/placeholder.png"
       let imageIpfsHash = ""
       if (metadata.image) {
-        let imageCid = metadata.image.startsWith("ipfs://") 
-          ? metadata.image.replace("ipfs://", "") 
-          : metadata.image
-        imageIpfsHash = imageCid
-        const imgUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`
-        
         try {
-          const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(5000) })
-          if (imgRes.ok) {
-            const blob = await imgRes.blob()
-            imageUrl = URL.createObjectURL(blob)
-          } else {
+          // Extract CID from image source (handles ipfs://, http, and raw CID)
+          const imageCid = extractCIDFromURI(metadata.image)
+          imageIpfsHash = imageCid
+          
+          // Get list of gateway URLs to try (in order of preference)
+          const imageGateways = getIPFSGatewayURLs(imageCid)
+          
+          let imageFetchSuccess = false
+          for (const imgGatewayUrl of imageGateways) {
+            try {
+              const imgRes = await fetch(imgGatewayUrl, { signal: AbortSignal.timeout(5000) })
+              if (imgRes.ok) {
+                const blob = await imgRes.blob()
+                imageUrl = URL.createObjectURL(blob)
+                imageFetchSuccess = true
+                break
+              }
+            } catch (error) {
+              continue
+            }
+          }
+          
+          if (!imageFetchSuccess) {
+            imageUrl = "/placeholder.png"
           }
         } catch (error) {
+          imageUrl = "/placeholder.png"
         }
       }
 

@@ -10,6 +10,7 @@ import DefaultLayout from "@/layouts/default"
 import { useNavigate } from "react-router-dom"
 import ElegantShapes from "@/components/ElegantShapes"
 import toast from "react-hot-toast";
+import { extractCIDFromURI, getIPFSGatewayURLs } from "@/lib/utils";
 
 type DeliveryStatus = 'Pending' | 'InTransit' | 'Delivered' | 'Failed'
 type OrderState = 'Created' | 'Released' | 'Cancelled'
@@ -294,32 +295,36 @@ export default function Order() {
           // Step 5: Fetch image from IPFS
           let imageUrl = "/placeholder.png"
           if (metadata.image && metadata.image !== "/placeholder.png") {
-            let imageCid = metadata.image
-            if (metadata.image.startsWith("ipfs://")) {
-              imageCid = metadata.image.replace("ipfs://", "")
-            } else if (metadata.image.includes("ipfs/")) {
-              imageCid = metadata.image.split("ipfs/").pop() || metadata.image
-            }
+            try {
+              // Extract CID from image source (handles ipfs://, http, and raw CID)
+              const imageCid = extractCIDFromURI(metadata.image)
+              
+              // Get list of gateway URLs to try (in order of preference)
+              const imageGateways = getIPFSGatewayURLs(imageCid)
 
-            const imageGateways = [
-              `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`,
-              `https://ipfs.io/ipfs/${imageCid}`,
-            ]
+              let imageFetchSuccess = false
+              for (const imgGatewayUrl of imageGateways) {
+                try {
+                  const imageResponse = await fetch(imgGatewayUrl, {
+                    signal: AbortSignal.timeout(5000)
+                  })
 
-            for (const imgGatewayUrl of imageGateways) {
-              try {
-                const imageResponse = await fetch(imgGatewayUrl, {
-                  signal: AbortSignal.timeout(5000)
-                })
-
-                if (imageResponse.ok) {
-                  const imageBlob = await imageResponse.blob()
-                  imageUrl = URL.createObjectURL(imageBlob)
-                  break
+                  if (imageResponse.ok) {
+                    const imageBlob = await imageResponse.blob()
+                    imageUrl = URL.createObjectURL(imageBlob)
+                    imageFetchSuccess = true
+                    break
+                  }
+                } catch (err) {
+                  continue
                 }
-              } catch (err) {
-                continue
               }
+              
+              if (!imageFetchSuccess) {
+                imageUrl = "/placeholder.png"
+              }
+            } catch (err) {
+              imageUrl = "/placeholder.png"
             }
           }
 

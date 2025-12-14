@@ -215,7 +215,7 @@ export default function VirtualProductMint() {
 
       const cid: string = response.data?.IpfsHash;
       if (!cid) throw new Error("No IpfsHash returned from Pinata");
-      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err: any) {
       return null;
     }
@@ -248,7 +248,7 @@ export default function VirtualProductMint() {
 
       const cid: string = response.data?.IpfsHash;
       if (!cid) throw new Error("No IpfsHash returned from Pinata");
-      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err: any) {
       toast.error("Digital asset upload failed")
       return null;
@@ -301,7 +301,7 @@ export default function VirtualProductMint() {
       )
 
       const cid: string = res.data.IpfsHash
-      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
+      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
     } catch (e) {
       toast.error('Metadata upload failed')
       return null
