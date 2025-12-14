@@ -154,6 +154,7 @@ export default function VirtualProductMint() {
   const MULTI_PRODUCT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
   const navigate = useNavigate();
   const [fileInfo, setFileInfo] = useState<FileInfoType | null>(null)
+  const [digitalAssetFile, setDigitalAssetFile] = useState<File | null>(null)
   const [formData, setFormData] = useState<FormDataType>({
     name: '',
     description: '',
@@ -220,14 +221,49 @@ export default function VirtualProductMint() {
     }
   }
   
+  // Upload digital asset file to IPFS via Pinata
+  const uploadDigitalAssetToIPFS = async (): Promise<{ cid: string; url: string } | null> => {
+    if (!digitalAssetFile) return null;
+
+    try {
+      console.log("📦 Uploading digital asset to IPFS...");
+      
+      const form = new FormData();
+      form.append("file", digitalAssetFile);
+      form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
+      form.append(
+        "pinataMetadata",
+        JSON.stringify({ name: `verimint_asset_${Date.now()}` })
+      );
+
+      const response = await axios.post(
+        "https://api.pinata.cloud/pinning/pinFileToIPFS",
+        form,
+        {
+          maxBodyLength: Infinity,
+          headers: {
+            Authorization: `Bearer ${pinataJWT}`,
+          },
+        }
+      );
+
+      const cid: string = response.data?.IpfsHash;
+      if (!cid) throw new Error("No IpfsHash returned from Pinata");
+      console.log("✅ Digital asset uploaded to IPFS:", cid);
+      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+    } catch (err: any) {
+      console.error("Digital asset upload failed:", err?.response?.data ?? err);
+      return null;
+    }
+  }
   
     // Upload NFT metadata JSON to IPFS via Pinata
-    const uploadJsonToIPFS = async (imageCid: string): Promise<{ cid: string; url: string } | null> => {
+    const uploadJsonToIPFS = async (imageCid: string, digitalAssetCid?: string): Promise<{ cid: string; url: string } | null> => {
       try {
         console.log("📦 Creating metadata JSON");
         console.log("Connected Address:", address);
         
-        const metadata = {
+        const metadata: any = {
           name: formData.name || 'Product',
           description: formData.description || '',
           image: `ipfs://${imageCid}`,
@@ -241,8 +277,13 @@ export default function VirtualProductMint() {
             { trait_type: 'Unlock Content', value: formData.unlockableContent },
             { trait_type: 'Price (ETH)', value: formData.price },
             { trait_type: 'Total Supply', value: formData.supply },
-            { trait_type: 'Merchant', value: address || 'Unknown' }, // ✅ Add merchant address
+            { trait_type: 'Merchant', value: address || 'Unknown' },
           ].filter(a => a.value && String(a.value).length > 0),
+        }
+        
+        // Add digital asset CID if available (hidden from display)
+        if (digitalAssetCid) {
+          metadata.digital_asset = `ipfs://${digitalAssetCid}`;
         }
 
       console.log("📝 Metadata to upload:", JSON.stringify(metadata, null, 2));
@@ -287,6 +328,7 @@ export default function VirtualProductMint() {
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      setDigitalAssetFile(file)
       setFileInfo({
         name: file.name,
         size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
@@ -326,9 +368,22 @@ export default function VirtualProductMint() {
     }
     console.log("✅ Image uploaded:", img.cid);
 
+    // Upload digital asset if provided
+    let digitalAsset = null;
+    if (digitalAssetFile) {
+      setLoadingMessage("Uploading digital asset to IPFS...");
+      console.log("2️⃣ Uploading digital asset to IPFS...");
+      digitalAsset = await uploadDigitalAssetToIPFS();
+      if (!digitalAsset) {
+        console.warn('⚠️ Digital asset upload failed, continuing without it');
+      } else {
+        console.log("✅ Digital asset uploaded:", digitalAsset.cid);
+      }
+    }
+
     setLoadingMessage("Uploading metadata to IPFS...");
-    console.log("2️⃣ Uploading metadata to IPFS...");
-    const meta = await uploadJsonToIPFS(img.cid)
+    console.log("3️⃣ Uploading metadata to IPFS...");
+    const meta = await uploadJsonToIPFS(img.cid, digitalAsset?.cid)
     if (!meta) {
       setIsLoading(false);
       alert('Metadata upload failed')
@@ -337,7 +392,7 @@ export default function VirtualProductMint() {
     console.log("✅ Metadata uploaded:", meta.cid);
 
     setLoadingMessage("Minting NFT on blockchain...");
-    console.log("3️⃣ Minting NFT on blockchain...");
+    console.log("4️⃣ Minting NFT on blockchain...");
     
     // Convert "virtual" to bytes32 using keccak256
     const productTypeBytes32 = keccak256(toBytes("virtual"));
@@ -495,6 +550,38 @@ export default function VirtualProductMint() {
                 <span className="text-white/40 text-xs font-normal ml-2">(Optional)</span>
               </label>
               <p className="text-xs text-white/40">Upload the actual digital file (3D model, video, audio, etc.)</p>
+              
+              {/* Supported File Formats */}
+              <div className="p-3 bg-white/[0.02] border border-white/[0.05] rounded-lg space-y-2">
+                <p className="text-xs font-medium text-white/60 mb-2">Supported Formats:</p>
+                <div className="grid grid-cols-1 gap-2 text-xs">
+                  <div className="flex gap-2">
+                    <span className="text-white/40 font-medium min-w-[70px]">Images:</span>
+                    <span className="text-white/50">jpg, png, gif, webp, svg, bmp, tiff, ico</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-white/40 font-medium min-w-[70px]">Audio:</span>
+                    <span className="text-white/50">mp3, wav, ogg, aac, flac, m4a, wma, opus</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-white/40 font-medium min-w-[70px]">Video:</span>
+                    <span className="text-white/50">mp4, mov, avi, mkv, webm, flv, wmv</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-white/40 font-medium min-w-[70px]">Documents:</span>
+                    <span className="text-white/50">pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv, html, json, xml</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-white/40 font-medium min-w-[70px]">Archives:</span>
+                    <span className="text-white/50">zip, rar, 7z, tar, gz</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-white/40 font-medium min-w-[70px]">3D Models:</span>
+                    <span className="text-white/50">glb, gltf, obj, stl, fbx</span>
+                  </div>
+                </div>
+              </div>
+              
               <div className="relative">
                 {fileInfo ? (
                   <div className="flex items-center justify-between p-4 bg-white/[0.03] border border-white/[0.08] rounded-xl group hover:border-white/[0.12] transition-all">
@@ -509,7 +596,10 @@ export default function VirtualProductMint() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setFileInfo(null)}
+                      onClick={() => {
+                        setFileInfo(null)
+                        setDigitalAssetFile(null)
+                      }}
                       className="p-2 hover:bg-rose-500/20 rounded-lg transition-all"
                     >
                       <X className="w-4 h-4 text-rose-400" />

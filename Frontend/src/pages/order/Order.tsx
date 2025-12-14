@@ -29,6 +29,7 @@ interface OrderType {
   merchantAddress: string
   deliveryStatus: DeliveryStatus
   orderState: OrderState
+  digitalAssetCid?: string
 }
 
 type OrderCardProps = {
@@ -58,6 +59,8 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
           name: order.name,
           description: order.description || "",
           image: order.image,
+          imageIpfsHash: "",
+          digitalAssetCid: order.digitalAssetCid || "",
           price: order.price,
           type: order.type,
           supply: order.supply,
@@ -332,6 +335,15 @@ export default function Order() {
               type = attrValue.includes("physical") ? "physical" : "virtual"
             }
           }
+          
+          // Step 6a: Extract digital asset CID if present
+          let digitalAssetCid = ""
+          if (metadata.digital_asset) {
+            digitalAssetCid = metadata.digital_asset.startsWith("ipfs://") 
+              ? metadata.digital_asset.replace("ipfs://", "") 
+              : metadata.digital_asset
+            console.log("💾 [Order Page] Digital asset CID found for order", orderId.toString(), ":", digitalAssetCid)
+          }
 
           // Step 7: Format date
           const createdTimestamp = Number(orderData.createdAt)
@@ -344,13 +356,27 @@ export default function Order() {
           // Step 8: Map status
           const deliveryStatusNum = Number(orderData.deliveryStatus)
           const orderStateNum = Number(orderData.state)
-          const displayStatus = mapOrderStateToDisplay(orderStateNum, deliveryStatusNum)
+          
+          // Auto-correct delivery status for virtual/no-delivery orders
+          let correctedDeliveryStatusNum = deliveryStatusNum
+          const nullHash = `0x${Array(64).fill('0').join('')}` // Placeholder, will be calculated properly
+          const isVirtualOrNoDelivery = 
+            type === "virtual" || 
+            orderMetaData.deliveryPointHash.toLowerCase().includes('null')
+          
+          if (isVirtualOrNoDelivery && (orderStateNum === 1 || orderStateNum === 0) && correctedDeliveryStatusNum === 0) {
+            console.log(`🔧 Auto-correcting delivery status for order ${orderId}`)
+            correctedDeliveryStatusNum = 2 // Set to Delivered
+          }
+          
+          const displayStatus = mapOrderStateToDisplay(orderStateNum, correctedDeliveryStatusNum)
 
           return {
             id: Number(orderId),
             orderId: orderId.toString(),
             tokenId: tokenId.toString(),
             name: metadata.name || `Token #${tokenId}`,
+            description: metadata.description || "",
             price: (Number(orderMetaData.totalPrice) / 1e18).toFixed(4),
             type,
             status: displayStatus,
@@ -359,8 +385,9 @@ export default function Order() {
             image: imageUrl,
             buyerAddress: orderData.buyer,
             merchantAddress: orderData.merchant,
-            deliveryStatus: ['Pending', 'InTransit', 'Delivered', 'Failed'][deliveryStatusNum] as DeliveryStatus,
+            deliveryStatus: ['Pending', 'InTransit', 'Delivered', 'Failed'][correctedDeliveryStatusNum] as DeliveryStatus,
             orderState: ['Created', 'Released', 'Cancelled'][orderStateNum] as OrderState,
+            digitalAssetCid: digitalAssetCid,
           }
         } catch (err) {
           console.error(`❌ Failed to load order ${orderId}:`, err)

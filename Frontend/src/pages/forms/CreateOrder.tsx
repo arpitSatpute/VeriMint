@@ -322,14 +322,27 @@ export default function CreateOrder() {
       });
       
       if (receipt.status === "success") {
-        setIsLoading(false);
         console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
+        
+        if (!nftData) {
+          throw new Error("NFT data is missing");
+        }
+        
+        setIsLoading(false);
         const totalEth = (Number(totalWei) / 1e18).toFixed(4);
         
         let successMessage = `✅ Order placed successfully!\n\nTransaction: ${tx}\nTotal: ${totalEth} ETH\nQuantity: ${quantity}`;
         
         if (supportsEncryption) {
           successMessage += "\n\n🔐 Delivery address encrypted with Lit Protocol\n✓ Merchant can only decrypt after order is funded";
+        }
+        
+        // Check if auto-completed
+        const isAutoCompleted = nftData.type === "virtual" || !formData.needsShipping;
+        if (isAutoCompleted) {
+          successMessage += nftData.type === "virtual" 
+            ? "\n\n🎨 Virtual product - Funds released instantly!\n✓ Your order is complete" 
+            : "\n\n📦 No shipping required - Funds released!\n✓ Order completed";
         }
         
         alert(successMessage + "\n\nRedirecting to orders page...");

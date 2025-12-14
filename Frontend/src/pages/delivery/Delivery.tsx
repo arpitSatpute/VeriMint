@@ -4,7 +4,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom"
 import { 
   ArrowLeft, Package, Clock, CheckCircle, XCircle, Truck, 
   MapPin, Hash, Eye, EyeOff, RefreshCw, AlertCircle, Unlock,
-  ShoppingCart, Loader2, AlertTriangle
+  ShoppingCart, Loader2, AlertTriangle, Download
 } from "lucide-react"
 import { useAccount } from "wagmi"
 import { readContract, writeContract, waitForTransactionReceipt } from "wagmi/actions"
@@ -22,6 +22,8 @@ interface OrderDetails {
   name: string
   description: string
   image: string
+  imageIpfsHash: string
+  digitalAssetCid: string
   price: string
   type: string
   supply: string
@@ -48,6 +50,7 @@ export default function DeliveryPage() {
   const [decryptionDeadline, setDecryptionDeadline] = useState<number>(0)
   const [timeRemaining, setTimeRemaining] = useState<string>("")
   const [deadlineExpired, setDeadlineExpired] = useState(false)
+  const [downloading, setDownloading] = useState(false)
 
   const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`
   const ORDER_MANAGER_ADDRESS = import.meta.env.VITE_ORDER_MANAGER_ADDRESS as `0x${string}`
@@ -104,6 +107,8 @@ export default function DeliveryPage() {
   const fetchDecryptionDeadline = async () => {
     if (!orderId || orderId === "0") return
     
+    console.log("⏰ [Delivery Page] Fetching decryption deadline for order:", orderId)
+    
     try {
       const deliveryData = await readContract(config, {
         address: ESCROW_ADDRESS,
@@ -112,15 +117,20 @@ export default function DeliveryPage() {
         args: [BigInt(orderId)],
       }) as any
       
+      console.log("🔐 [Delivery Page] Encrypted delivery data:", deliveryData)
+      
       // deliveryData[3] is decryptionDeadline in the return tuple
       if (deliveryData && deliveryData[3]) {
         setDecryptionDeadline(Number(deliveryData[3]))
+        console.log("⏰ [Delivery Page] Decryption deadline set:", Number(deliveryData[3]))
       }
     } catch (error: any) {
       // Silently ignore "No encrypted data" or authorization errors for non-encrypted orders
       const errorMsg = error?.message || ""
       if (!errorMsg.includes("No encrypted data") && !errorMsg.includes("Not authorized")) {
-        console.error("Failed to fetch decryption deadline:", error)
+        console.error("❌ [Delivery Page] Failed to fetch decryption deadline:", error)
+      } else {
+        console.log("ℹ️ [Delivery Page] No encrypted data available (expected for virtual/no-delivery orders)")
       }
     }
   }
@@ -128,16 +138,22 @@ export default function DeliveryPage() {
   const loadOrderDetails = async () => {
     if (!orderId) return
     setLoading(true)
+    
+    console.log("🔍 [Delivery Page] Loading order details for orderId:", orderId)
+    console.log("👤 [Delivery Page] Current user address:", address)
 
     try {
       const passedData = (location.state as any)?.orderData
 
       if (passedData) {
+        console.log("📦 [Delivery Page] Using passed order data:", passedData)
         setOrder(passedData)
         setIsMerchant(address?.toLowerCase() === passedData.merchantAddress?.toLowerCase())
         setLoading(false)
         return
       }
+      
+      console.log("🔄 [Delivery Page] Fetching order data from contracts...")
 
       // Fetch from contracts
       const orderData = await readContract(config, {
@@ -146,6 +162,8 @@ export default function DeliveryPage() {
         functionName: "getOrder",
         args: [BigInt(orderId)],
       }) as any
+      
+      console.log("📋 [Delivery Page] Raw orderData from contract:", orderData)
 
       const orderMeta = await readContract(config, {
         address: ORDER_MANAGER_ADDRESS,
@@ -153,16 +171,22 @@ export default function DeliveryPage() {
         functionName: "getOrderMeta",
         args: [BigInt(orderId)],
       }) as any
+      
+      console.log("📋 [Delivery Page] Raw orderMeta from contract:", orderMeta)
 
       const tokenId = orderData.tokenId
+      console.log("🎫 [Delivery Page] Token ID:", tokenId.toString())
       let uri = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
         functionName: "uri",
         args: [tokenId],
       }) as string
+      
+      console.log("🔗 [Delivery Page] NFT URI:", uri)
 
       if (!uri || uri.trim() === "") {
+        console.log("⚠️ [Delivery Page] URI is empty, fetching from getProduct...")
         const product = await readContract(config, {
           address: PRODUCT_NFT_ADDRESS,
           abi: PRODUCT_NFT_ABI,
@@ -170,44 +194,109 @@ export default function DeliveryPage() {
           args: [tokenId],
         }) as any
         uri = product.tokenURI
+        console.log("🔗 [Delivery Page] Product tokenURI:", uri)
       }
 
       let metadata: any = { name: `Token #${tokenId}`, description: "", image: "/placeholder.png" }
       if (uri) {
         let cid = uri.startsWith("ipfs://") ? uri.replace("ipfs://", "") : uri
         const metadataUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${cid}`
+        console.log("📡 [Delivery Page] Fetching metadata from:", metadataUrl)
         
         try {
           const res = await fetch(metadataUrl, { signal: AbortSignal.timeout(5000) })
-          if (res.ok) metadata = await res.json()
-        } catch {}
+          if (res.ok) {
+            metadata = await res.json()
+            console.log("📄 [Delivery Page] Metadata fetched:", metadata)
+          } else {
+            console.log("⚠️ [Delivery Page] Metadata fetch failed with status:", res.status)
+          }
+        } catch (error) {
+          console.log("❌ [Delivery Page] Metadata fetch error:", error)
+        }
       }
 
       let imageUrl = "/placeholder.png"
+      let imageIpfsHash = ""
       if (metadata.image) {
         let imageCid = metadata.image.startsWith("ipfs://") 
           ? metadata.image.replace("ipfs://", "") 
           : metadata.image
+        imageIpfsHash = imageCid
         const imgUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`
+        console.log("🖼️ [Delivery Page] Fetching image from:", imgUrl)
         
         try {
           const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(5000) })
           if (imgRes.ok) {
             const blob = await imgRes.blob()
             imageUrl = URL.createObjectURL(blob)
+            console.log("✅ [Delivery Page] Image loaded successfully")
+          } else {
+            console.log("⚠️ [Delivery Page] Image fetch failed with status:", imgRes.status)
           }
-        } catch {}
+        } catch (error) {
+          console.log("❌ [Delivery Page] Image fetch error:", error)
+        }
       }
 
       let type = "virtual"
+      let digitalAssetCid = ""
       if (metadata.attributes) {
+        console.log("🏷️ [Delivery Page] Metadata attributes:", metadata.attributes)
         const typeAttr = metadata.attributes.find((a: any) => 
           a.trait_type?.toLowerCase() === "type"
         )
         if (typeAttr) {
           type = String(typeAttr.value).toLowerCase().includes("physical") ? "physical" : "virtual"
+          console.log("📦 [Delivery Page] Product type:", type)
         }
       }
+      
+      // Extract digital asset CID if present
+      if (metadata.digital_asset) {
+        digitalAssetCid = metadata.digital_asset.startsWith("ipfs://") 
+          ? metadata.digital_asset.replace("ipfs://", "") 
+          : metadata.digital_asset
+        console.log("💾 [Delivery Page] Digital asset CID found:", digitalAssetCid)
+      } else {
+        console.log("ℹ️ [Delivery Page] No digital asset CID in metadata")
+      }
+
+      // Check if this is a virtual or no-delivery order
+      const nullHash = keccak256(encodePacked(['string'], ['null']))
+      const isVirtualOrNoDelivery = 
+        type === "virtual" || 
+        orderMeta.deliveryPointHash.toLowerCase() === nullHash.toLowerCase()
+      
+      console.log("📊 Order Debug Info:", {
+        orderId,
+        type,
+        deliveryPointHash: orderMeta.deliveryPointHash,
+        nullHash,
+        isVirtualOrNoDelivery,
+        originalDeliveryStatus: Number(orderData.deliveryStatus),
+        orderState: Number(orderData.state),
+        digitalAssetCid
+      })
+      
+      // For virtual/no-delivery orders, auto-correct delivery status
+      // If the order is Released (state 1) OR if it's funded (state 0), set status to Delivered (2)
+      let correctedDeliveryStatus = Number(orderData.deliveryStatus)
+      if (isVirtualOrNoDelivery) {
+        const orderState = Number(orderData.state)
+        // If Released or if still Created (old contract behavior)
+        if ((orderState === 1 || orderState === 0) && correctedDeliveryStatus === 0) {
+          console.log("🔧 Auto-correcting delivery status for virtual/no-delivery order")
+          correctedDeliveryStatus = 2 // Set to Delivered
+        }
+      }
+      
+      console.log("✅ Final delivery status:", correctedDeliveryStatus)
+      console.log("🎨 Digital Asset CID:", digitalAssetCid)
+      console.log("🔍 Download button will show:", 
+        !isMerchant && type === "virtual" && digitalAssetCid && correctedDeliveryStatus === 2
+      )
 
       const orderDetails: OrderDetails = {
         orderId: orderId,
@@ -215,24 +304,31 @@ export default function DeliveryPage() {
         name: metadata.name || `Token #${tokenId}`,
         description: metadata.description || "",
         image: imageUrl,
+        imageIpfsHash: imageIpfsHash,
+        digitalAssetCid: digitalAssetCid,
         price: (Number(orderMeta.totalPrice) / 1e18).toFixed(4),
         type,
         supply: orderMeta.supply.toString(),
         buyerAddress: orderData.buyer,
         merchantAddress: orderData.merchant,
-        deliveryStatus: Number(orderData.deliveryStatus),
+        deliveryStatus: correctedDeliveryStatus,
         orderState: Number(orderData.state),
         createdAt: Number(orderData.createdAt),
         deliveryPointHash: orderMeta.deliveryPointHash,
       }
+      
+      console.log("📦 [Delivery Page] Complete Order Details:", orderDetails)
+      console.log("👤 [Delivery Page] Is Merchant:", address?.toLowerCase() === orderDetails.merchantAddress?.toLowerCase())
+      console.log("👤 [Delivery Page] Is Buyer:", address?.toLowerCase() === orderDetails.buyerAddress?.toLowerCase())
 
       setOrder(orderDetails)
       setIsMerchant(address?.toLowerCase() === orderDetails.merchantAddress?.toLowerCase())
     } catch (error) {
-      console.error("Failed to load order:", error)
+      console.error("❌ [Delivery Page] Failed to load order:", error)
       alert("Failed to load order details")
     } finally {
       setLoading(false)
+      console.log("✅ [Delivery Page] Loading complete")
     }
   }
 
@@ -403,6 +499,179 @@ export default function DeliveryPage() {
     }
   }
 
+  const downloadDigitalAsset = async () => {
+    if (!order?.digitalAssetCid || order.type !== "virtual") return
+    
+    console.log("⬇️ [Delivery Page] Download initiated")
+    console.log("📦 [Delivery Page] Order:", order)
+    console.log("💾 [Delivery Page] Digital Asset CID:", order.digitalAssetCid)
+    
+    if (isMerchant) {
+      console.log("❌ [Delivery Page] Download blocked: User is merchant")
+      alert("Only buyers can download the digital asset")
+      return
+    }
+    
+    // Check if delivery is completed
+    if (order.deliveryStatus !== 2) {
+      console.log("❌ [Delivery Page] Download blocked: Delivery not completed (status:", order.deliveryStatus, ")")
+      alert("Digital asset will be available after delivery is completed")
+      return
+    }
+
+    setDownloading(true)
+
+    try {
+      const ipfsUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${order.digitalAssetCid}`
+      console.log("📡 [Delivery Page] Fetching from IPFS:", ipfsUrl)
+      
+      // Fetch the file from IPFS
+      const response = await fetch(ipfsUrl)
+      console.log("📡 [Delivery Page] IPFS response status:", response.status)
+      
+      if (!response.ok) throw new Error("Failed to fetch from IPFS")
+      
+      const blob = await response.blob()
+      console.log("📦 [Delivery Page] Blob size:", blob.size, "bytes")
+      
+      // Determine file extension from multiple sources
+      const contentType = response.headers.get("content-type") || "application/octet-stream"
+      const contentDisposition = response.headers.get("content-disposition")
+      console.log("📄 [Delivery Page] Content type:", contentType)
+      console.log("📄 [Delivery Page] Content disposition:", contentDisposition)
+      
+      let extension = ""
+      
+      // Try to get extension from content-disposition header
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+        if (filenameMatch && filenameMatch[1]) {
+          const filename = filenameMatch[1].replace(/['"]/g, '')
+          const extMatch = filename.match(/\.([^.]+)$/)
+          if (extMatch) {
+            extension = extMatch[1].toLowerCase()
+            console.log("📝 [Delivery Page] Extension from content-disposition:", extension)
+          }
+        }
+      }
+      
+      // If no extension found, determine from content-type
+      if (!extension) {
+        const mimeToExt: Record<string, string> = {
+          // Images
+          "image/jpeg": "jpg",
+          "image/jpg": "jpg",
+          "image/png": "png",
+          "image/gif": "gif",
+          "image/webp": "webp",
+          "image/svg+xml": "svg",
+          "image/bmp": "bmp",
+          "image/tiff": "tiff",
+          
+          // Audio
+          "audio/mpeg": "mp3",
+          "audio/mp3": "mp3",
+          "audio/wav": "wav",
+          "audio/ogg": "ogg",
+          "audio/webm": "webm",
+          "audio/aac": "aac",
+          "audio/flac": "flac",
+          "audio/m4a": "m4a",
+          
+          // Video
+          "video/mp4": "mp4",
+          "video/mpeg": "mpeg",
+          "video/webm": "webm",
+          "video/ogg": "ogv",
+          "video/quicktime": "mov",
+          "video/x-msvideo": "avi",
+          "video/x-matroska": "mkv",
+          
+          // Documents
+          "application/pdf": "pdf",
+          "application/msword": "doc",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+          "application/vnd.ms-excel": "xls",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+          "application/vnd.ms-powerpoint": "ppt",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+          "text/plain": "txt",
+          "text/csv": "csv",
+          "text/html": "html",
+          "text/css": "css",
+          "text/javascript": "js",
+          "application/json": "json",
+          "application/xml": "xml",
+          "text/xml": "xml",
+          
+          // Archives
+          "application/zip": "zip",
+          "application/x-rar-compressed": "rar",
+          "application/x-7z-compressed": "7z",
+          "application/x-tar": "tar",
+          "application/gzip": "gz",
+          
+          // 3D Models
+          "model/gltf-binary": "glb",
+          "model/gltf+json": "gltf",
+          "model/obj": "obj",
+          "model/stl": "stl",
+          "model/fbx": "fbx",
+          
+          // Other
+          "application/octet-stream": "bin",
+        }
+        
+        extension = mimeToExt[contentType.toLowerCase()] || ""
+        
+        // If still no exact match, try partial match
+        if (!extension) {
+          if (contentType.includes("image/")) {
+            extension = contentType.split("/")[1]?.split("+")[0] || "png"
+          } else if (contentType.includes("audio/")) {
+            extension = contentType.split("/")[1]?.split("+")[0] || "mp3"
+          } else if (contentType.includes("video/")) {
+            extension = contentType.split("/")[1]?.split("+")[0] || "mp4"
+          } else if (contentType.includes("text/")) {
+            extension = "txt"
+          } else if (contentType.includes("application/")) {
+            extension = "bin"
+          }
+        }
+        
+        console.log("📝 [Delivery Page] Extension from content-type:", extension)
+      }
+      
+      // Final fallback
+      if (!extension) {
+        extension = "file"
+        console.log("⚠️ [Delivery Page] Using fallback extension:", extension)
+      }
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      const fileName = `${order.name.replace(/[^a-z0-9]/gi, '_')}_${order.tokenId}.${extension}`
+      a.download = fileName
+      console.log("💾 [Delivery Page] Download filename:", fileName)
+      
+      document.body.appendChild(a)
+      a.click()
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      console.log("✅ [Delivery Page] Digital asset downloaded successfully")
+    } catch (error: any) {
+      console.error("Failed to download:", error)
+      alert(`❌ Failed to download digital asset:\n${error?.message || "Unknown error"}`)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   const getStatusInfo = (status: number) => {
     const statuses = [
       { label: "Pending", icon: Clock, color: "amber" },
@@ -519,7 +788,43 @@ export default function DeliveryPage() {
                         <Package className="w-4 h-4 text-white/40" />
                         <span className="text-white/70">Qty: {order.supply}</span>
                       </div>
+                      {/* Digital asset indicator */}
+                      {order.type === "virtual" && order.digitalAssetCid && (
+                        <div className="flex items-center gap-1">
+                          <Download className="w-4 h-4 text-indigo-400" />
+                          <span className="text-indigo-300 text-xs">Digital Asset Available</span>
+                        </div>
+                      )}
                     </div>
+                    
+                    {/* Download button for virtual products (buyer only, when delivered) */}
+                    {!isMerchant && order.type === "virtual" && order.digitalAssetCid && order.deliveryStatus === 2 && (
+                      <button
+                        onClick={downloadDigitalAsset}
+                        disabled={downloading}
+                        className="mt-3 px-4 py-2 bg-gradient-to-r from-emerald-500/30 to-green-500/30 border-2 border-emerald-500/50 rounded-lg text-emerald-100 font-semibold hover:from-emerald-500/40 hover:to-green-500/40 hover:border-emerald-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                      >
+                        {downloading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-5 h-5" />
+                            Download Digital Asset
+                          </>
+                        )}
+                      </button>
+                    )}
+                    
+                    {/* Pending download message for virtual products */}
+                    {!isMerchant && order.type === "virtual" && order.digitalAssetCid && order.deliveryStatus !== 2 && (
+                      <div className="mt-3 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-amber-400" />
+                        <span className="text-amber-200 text-sm">Digital asset will be available when order is delivered</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -830,6 +1135,9 @@ export default function DeliveryPage() {
                   </div>
                 </motion.div>
               )}
+
+              {/* Virtual NFT Download (Buyer Only, When Delivered) */}
+              
             </div>
           </div>
         </div>

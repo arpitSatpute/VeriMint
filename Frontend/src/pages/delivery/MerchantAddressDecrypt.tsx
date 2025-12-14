@@ -66,6 +66,34 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
     };
   }, []);
 
+  // Copy/Cut prevention for privacy
+  useEffect(() => {
+    const preventCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      console.log('📋 Copy attempt blocked for privacy');
+    };
+
+    const preventCut = (e: ClipboardEvent) => {
+      e.preventDefault();
+      console.log('✂️ Cut attempt blocked for privacy');
+    };
+
+    const preventDragStart = (e: DragEvent) => {
+      e.preventDefault();
+      console.log('🚫 Drag attempt blocked for privacy');
+    };
+
+    window.addEventListener('copy', preventCopy);
+    window.addEventListener('cut', preventCut);
+    window.addEventListener('dragstart', preventDragStart);
+
+    return () => {
+      window.removeEventListener('copy', preventCopy);
+      window.removeEventListener('cut', preventCut);
+      window.removeEventListener('dragstart', preventDragStart);
+    };
+  }, []);
+
   useEffect(() => {
     loadEncryptedData();
   }, [orderId, address]);
@@ -661,27 +689,17 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="text-xs md:text-sm font-semibold text-white/60 mb-3 uppercase tracking-wide">Shipping Address</h4>
-                          <div className="text-base md:text-lg text-white/95 leading-relaxed font-medium whitespace-pre-wrap break-words">
+                          <div className="text-base md:text-lg text-white/95 leading-relaxed font-medium whitespace-pre-wrap break-words select-none" style={{ userSelect: 'none', WebkitUserSelect: 'none', msUserSelect: 'none' }}>
                             {decryptedAddress}
                           </div>
                         </div>
                       </div>
                       
                       <div className="flex items-center gap-3 pt-4 border-t border-white/[0.1]">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            navigator.clipboard.writeText(decryptedAddress || "")
-                            alert("✓ Address copied to clipboard")
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] hover:border-white/[0.15] transition-all text-xs md:text-sm font-medium text-white/70 hover:text-white/90"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          Copy Address
-                        </motion.button>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs md:text-sm font-medium text-rose-300/80">
+                          <Lock className="w-4 h-4" />
+                          Copy Disabled for Privacy
+                        </div>
                       </div>
                     </div>
                   </motion.div>
