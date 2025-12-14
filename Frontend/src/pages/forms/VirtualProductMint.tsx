@@ -11,6 +11,7 @@ import { useAccount } from "wagmi"; // ✅ Add this import
 import { Navigate, useNavigate } from "react-router-dom";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
+
 type ElegantShapeProps = {
   className?: string;
   delay?: number;

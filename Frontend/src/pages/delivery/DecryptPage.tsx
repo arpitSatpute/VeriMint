@@ -88,7 +88,6 @@ export default function DecryptPage() {
                 </div>
               </motion.div>
             </div>
-
             {/* Info Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
               <motion.div

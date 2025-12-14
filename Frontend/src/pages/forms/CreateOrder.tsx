@@ -11,11 +11,12 @@ import { keccak256, toHex, encodePacked } from "viem";
 import { useAccount } from "wagmi";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import {
-  encryptDeliveryAddress,
+  encryptDeliveryAddressUnified as encryptDeliveryAddress,
+  formatEncryptedDataForContractUnified as formatEncryptedDataForContract,
+  getAuthSignature,
+  verifyAddressCommitment,
   generateDeliveryHash,
-  formatEncryptedDataForContract,
-  isEncryptionSupported,
-} from "@/lib/encryptionUtils";
+} from "@/lib/unifiedEncryption";
 
 interface FormDataType {
   tokenId: string
@@ -53,7 +54,8 @@ export default function CreateOrder() {
   const [maxSupply, setMaxSupply] = useState<number>(0);
   const [useEncryption, setUseEncryption] = useState(true);
   const [encryptionSupported, setEncryptionSupported] = useState(false);
-  
+  const isEncryptionSupported = () => true; // Always supported with fallback
+
   const ESCROW_MULTI_PRODUCT = import.meta.env.VITE_ESCROW_MULTI_PRODUCT_ADDRESS as `0x${string}`;
   const PRODUCT_NFT_ADDRESS = import.meta.env.VITE_PRODUCT_NFT_ADDRESS as `0x${string}`;
 

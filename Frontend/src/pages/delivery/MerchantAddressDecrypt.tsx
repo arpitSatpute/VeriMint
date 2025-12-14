@@ -5,11 +5,10 @@ import { readContract, writeContract, waitForTransactionReceipt } from "wagmi/ac
 import { config } from "@/config/config";
 import { useAccount } from "wagmi";
 import {
-  decryptDeliveryAddress,
+  decryptDeliveryAddressUnified as decryptDeliveryAddress,
   getAuthSignature,
   verifyAddressCommitment,
-  parseEncryptedDataFromContract,
-} from "@/lib/encryptionUtils";
+} from "@/lib/unifiedEncryption";
 import ESCROW_ABI from "@/abis/escrowMultiProduct.json";
 
 interface MerchantAddressDecryptProps {
@@ -764,39 +763,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       )}
 
       {/* Security Notice */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-        className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-5 hover:border-white/[0.12] transition-all"
-      >
-        <div className="flex items-start gap-4">
-          <div className="p-2 bg-amber-500/10 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-          </div>
-          <div className="text-xs md:text-sm text-white/60">
-            <p className="font-semibold text-white/80 mb-3 text-sm md:text-base">Privacy & Security Notice</p>
-            <ul className="space-y-2 list-none">
-              <li className="flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">•</span>
-                <span>All decryption attempts are logged on-chain for transparency</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">•</span>
-                <span>Delete the plaintext address after creating shipping label</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">•</span>
-                <span>Never store decrypted addresses in unsecured databases</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-indigo-400 mt-0.5">•</span>
-                <span>Access expires after the delivery deadline</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </motion.div>
+      
 
       {/* Black Screen Overlay - Screenshot Prevention */}
       {showBlackScreen && (
