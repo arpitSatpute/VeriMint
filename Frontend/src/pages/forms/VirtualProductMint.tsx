@@ -7,6 +7,7 @@ import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { parseEther, keccak256, toBytes } from "viem";
+import { formatCIDAsIPFS } from "@/lib/utils";
 import { useAccount } from "wagmi"; // ✅ Add this import
 import { Navigate, useNavigate } from "react-router-dom";
 import LoadingOverlay from "@/components/LoadingOverlay";
@@ -215,7 +216,7 @@ export default function VirtualProductMint() {
 
       const cid: string = response.data?.IpfsHash;
       if (!cid) throw new Error("No IpfsHash returned from Pinata");
-      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+      return { cid: formatCIDAsIPFS(cid), url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err: any) {
       return null;
     }
@@ -248,7 +249,7 @@ export default function VirtualProductMint() {
 
       const cid: string = response.data?.IpfsHash;
       if (!cid) throw new Error("No IpfsHash returned from Pinata");
-      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+      return { cid: formatCIDAsIPFS(cid), url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err: any) {
       toast.error("Digital asset upload failed")
       return null;
@@ -262,7 +263,7 @@ export default function VirtualProductMint() {
         const metadata: any = {
           name: formData.name || 'Product',
           description: formData.description || '',
-          image: `ipfs://${imageCid}`,
+          image: formatCIDAsIPFS(imageCid),
           external_url: formData.externalLink || '',
           attributes: [
             { trait_type: 'Type', value: 'virtual' },
@@ -279,7 +280,7 @@ export default function VirtualProductMint() {
         
         // Add digital asset CID if available (hidden from display)
         if (digitalAssetCid) {
-          metadata.digital_asset = `ipfs://${digitalAssetCid}`;
+          metadata.digital_asset = formatCIDAsIPFS(digitalAssetCid);
         }
 
 
@@ -301,7 +302,7 @@ export default function VirtualProductMint() {
       )
 
       const cid: string = res.data.IpfsHash
-      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
+      return { cid: formatCIDAsIPFS(cid), url: `https://gateway.pinata.cloud/ipfs/${cid}` }
     } catch (e) {
       toast.error('Metadata upload failed')
       return null

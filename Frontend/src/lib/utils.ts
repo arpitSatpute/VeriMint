@@ -7,18 +7,24 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Extracts CID from various IPFS URI formats
- * Handles: ipfs://QM..., https://gateway.pinata.cloud/ipfs/QM..., or raw CID
+ * Handles: ipfs://QM..., ipfs://ipfs://QM..., https://gateway.pinata.cloud/ipfs/QM..., or raw CID
  */
 export function extractCIDFromURI(uri: string): string {
   if (!uri) return ""
   
-  if (uri.startsWith("ipfs://")) {
-    return uri.replace("ipfs://", "")
-  } else if (uri.includes("ipfs/")) {
-    return uri.split("ipfs/").pop() || uri
+  let result = uri
+  
+  // Remove all leading ipfs:// prefixes (handles ipfs://ipfs://...QM case)
+  while (result.startsWith("ipfs://")) {
+    result = result.slice(7) // Remove "ipfs://"
   }
   
-  return uri
+  // Handle gateway URLs with ipfs/ path
+  if (result.includes("ipfs/")) {
+    result = result.split("ipfs/").pop() || result
+  }
+  
+  return result
 }
 
 /**
@@ -27,8 +33,18 @@ export function extractCIDFromURI(uri: string): string {
 export function formatCIDAsIPFS(cid: string): string {
   if (!cid) return ""
   
-  // Remove any existing ipfs:// prefix
-  const cleanCID = cid.replace("ipfs://", "").split("ipfs/").pop() || cid
+  // Remove any existing ipfs:// prefix and ipfs/ path segments
+  let cleanCID = cid
+  
+  // Remove leading ipfs:// protocol (can occur multiple times)
+  while (cleanCID.startsWith("ipfs://")) {
+    cleanCID = cleanCID.slice(7) // Remove "ipfs://"
+  }
+  
+  // Remove ipfs/ path if it exists
+  if (cleanCID.includes("ipfs/")) {
+    cleanCID = cleanCID.split("ipfs/").pop() || cleanCID
+  }
   
   return `ipfs://${cleanCID}`
 }

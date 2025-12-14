@@ -6,6 +6,7 @@ import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { config } from "@/config/config";
 import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import { parseEther, keccak256, toBytes } from "viem";
+import { formatCIDAsIPFS } from "@/lib/utils";
 import DefaultLayout from "@/layouts/default";
 import { useAccount } from "wagmi";
 import { useNavigate } from "react-router-dom";
@@ -219,7 +220,9 @@ export default function PhysicalProductMint() {
       );
 
       const cid: string = response.data?.IpfsHash;
-      return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
+      const imageUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
+      
+      return { cid, url: imageUrl };
     } catch (err) {
       return null;
     }
@@ -229,12 +232,14 @@ export default function PhysicalProductMint() {
   // FIX APPLIED HERE → store HTTPS gateway for image
   const uploadJsonToIPFS = async (imageCid: string) => {
     try {
+      const imageIpfsUri = formatCIDAsIPFS(imageCid);
+      
       const metadata = {
         name: formData.name || 'Product',
         description: formData.description || '',
 
         // FIX (IMPORTANT) - Store image CID in ipfs:// format
-        image: `ipfs://${imageCid}`,
+        image: imageIpfsUri,
 
         attributes: [
           { trait_type: 'Type', value: 'physical' },
@@ -269,8 +274,11 @@ export default function PhysicalProductMint() {
         }
       )
 
-      const cid = res.data.IpfsHash
-      return { cid: `ipfs://${cid}`, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
+      const cid = res.data.IpfsHash;
+      const metadataUri = formatCIDAsIPFS(cid);
+      const metadataUrl = `https://gateway.pinata.cloud/ipfs/${cid}`;
+      
+      return { cid: metadataUri, url: metadataUrl };
     } catch (e) {
       toast.error('Metadata upload failed')
       return null
@@ -318,12 +326,12 @@ export default function PhysicalProductMint() {
       return toast.error('Metadata upload failed');
     }
 
-
     try {
       // Convert "physical" to bytes32 using keccak256
       const productTypeBytes32 = keccak256(toBytes("physical"));
 
       setLoadingMessage("Minting product NFT...");
+      
       const txHash = await writeContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
@@ -339,7 +347,9 @@ export default function PhysicalProductMint() {
       });
 
       setLoadingMessage("Waiting for transaction confirmation...");
+      
       const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+      
       if (receipt.status === "success") {
         setIsLoading(false);
         toast.success('Physical product minted successfully');
