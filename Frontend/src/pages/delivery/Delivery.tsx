@@ -15,6 +15,7 @@ import PRODUCT_NFT_ABI from "@/abis/productNft.json"
 import { keccak256, encodePacked } from "viem"
 import DefaultLayout from "@/layouts/default"
 import ElegantShapes from "@/components/ElegantShapes"
+import toast from "react-hot-toast"
 
 interface OrderDetails {
   orderId: string
@@ -107,7 +108,6 @@ export default function DeliveryPage() {
   const fetchDecryptionDeadline = async () => {
     if (!orderId || orderId === "0") return
     
-    console.log("⏰ [Delivery Page] Fetching decryption deadline for order:", orderId)
     
     try {
       const deliveryData = await readContract(config, {
@@ -117,12 +117,10 @@ export default function DeliveryPage() {
         args: [BigInt(orderId)],
       }) as any
       
-      console.log("🔐 [Delivery Page] Encrypted delivery data:", deliveryData)
       
       // deliveryData[3] is decryptionDeadline in the return tuple
       if (deliveryData && deliveryData[3]) {
         setDecryptionDeadline(Number(deliveryData[3]))
-        console.log("⏰ [Delivery Page] Decryption deadline set:", Number(deliveryData[3]))
       }
     } catch (error: any) {
       // Silently ignore "No encrypted data" or authorization errors for non-encrypted orders
@@ -130,7 +128,6 @@ export default function DeliveryPage() {
       if (!errorMsg.includes("No encrypted data") && !errorMsg.includes("Not authorized")) {
         console.error("❌ [Delivery Page] Failed to fetch decryption deadline:", error)
       } else {
-        console.log("ℹ️ [Delivery Page] No encrypted data available (expected for virtual/no-delivery orders)")
       }
     }
   }
@@ -139,21 +136,17 @@ export default function DeliveryPage() {
     if (!orderId) return
     setLoading(true)
     
-    console.log("🔍 [Delivery Page] Loading order details for orderId:", orderId)
-    console.log("👤 [Delivery Page] Current user address:", address)
 
     try {
       const passedData = (location.state as any)?.orderData
 
       if (passedData) {
-        console.log("📦 [Delivery Page] Using passed order data:", passedData)
         setOrder(passedData)
         setIsMerchant(address?.toLowerCase() === passedData.merchantAddress?.toLowerCase())
         setLoading(false)
         return
       }
       
-      console.log("🔄 [Delivery Page] Fetching order data from contracts...")
 
       // Fetch from contracts
       const orderData = await readContract(config, {
@@ -163,7 +156,6 @@ export default function DeliveryPage() {
         args: [BigInt(orderId)],
       }) as any
       
-      console.log("📋 [Delivery Page] Raw orderData from contract:", orderData)
 
       const orderMeta = await readContract(config, {
         address: ORDER_MANAGER_ADDRESS,
@@ -172,10 +164,8 @@ export default function DeliveryPage() {
         args: [BigInt(orderId)],
       }) as any
       
-      console.log("📋 [Delivery Page] Raw orderMeta from contract:", orderMeta)
 
       const tokenId = orderData.tokenId
-      console.log("🎫 [Delivery Page] Token ID:", tokenId.toString())
       let uri = await readContract(config, {
         address: PRODUCT_NFT_ADDRESS,
         abi: PRODUCT_NFT_ABI,
@@ -183,10 +173,8 @@ export default function DeliveryPage() {
         args: [tokenId],
       }) as string
       
-      console.log("🔗 [Delivery Page] NFT URI:", uri)
 
       if (!uri || uri.trim() === "") {
-        console.log("⚠️ [Delivery Page] URI is empty, fetching from getProduct...")
         const product = await readContract(config, {
           address: PRODUCT_NFT_ADDRESS,
           abi: PRODUCT_NFT_ABI,
@@ -194,25 +182,20 @@ export default function DeliveryPage() {
           args: [tokenId],
         }) as any
         uri = product.tokenURI
-        console.log("🔗 [Delivery Page] Product tokenURI:", uri)
       }
 
-      let metadata: any = { name: `Token #${tokenId}`, description: "", image: "/placeholder.png" }
+      let metadata: any = { name: `Token ${tokenId}`, description: "", image: "/placeholder.png" }
       if (uri) {
         let cid = uri.startsWith("ipfs://") ? uri.replace("ipfs://", "") : uri
         const metadataUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${cid}`
-        console.log("📡 [Delivery Page] Fetching metadata from:", metadataUrl)
         
         try {
           const res = await fetch(metadataUrl, { signal: AbortSignal.timeout(5000) })
           if (res.ok) {
             metadata = await res.json()
-            console.log("📄 [Delivery Page] Metadata fetched:", metadata)
           } else {
-            console.log("⚠️ [Delivery Page] Metadata fetch failed with status:", res.status)
           }
         } catch (error) {
-          console.log("❌ [Delivery Page] Metadata fetch error:", error)
         }
       }
 
@@ -224,32 +207,26 @@ export default function DeliveryPage() {
           : metadata.image
         imageIpfsHash = imageCid
         const imgUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${imageCid}`
-        console.log("🖼️ [Delivery Page] Fetching image from:", imgUrl)
         
         try {
           const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(5000) })
           if (imgRes.ok) {
             const blob = await imgRes.blob()
             imageUrl = URL.createObjectURL(blob)
-            console.log("✅ [Delivery Page] Image loaded successfully")
           } else {
-            console.log("⚠️ [Delivery Page] Image fetch failed with status:", imgRes.status)
           }
         } catch (error) {
-          console.log("❌ [Delivery Page] Image fetch error:", error)
         }
       }
 
       let type = "virtual"
       let digitalAssetCid = ""
       if (metadata.attributes) {
-        console.log("🏷️ [Delivery Page] Metadata attributes:", metadata.attributes)
         const typeAttr = metadata.attributes.find((a: any) => 
           a.trait_type?.toLowerCase() === "type"
         )
         if (typeAttr) {
           type = String(typeAttr.value).toLowerCase().includes("physical") ? "physical" : "virtual"
-          console.log("📦 [Delivery Page] Product type:", type)
         }
       }
       
@@ -258,9 +235,7 @@ export default function DeliveryPage() {
         digitalAssetCid = metadata.digital_asset.startsWith("ipfs://") 
           ? metadata.digital_asset.replace("ipfs://", "") 
           : metadata.digital_asset
-        console.log("💾 [Delivery Page] Digital asset CID found:", digitalAssetCid)
       } else {
-        console.log("ℹ️ [Delivery Page] No digital asset CID in metadata")
       }
 
       // Check if this is a virtual or no-delivery order
@@ -269,16 +244,6 @@ export default function DeliveryPage() {
         type === "virtual" || 
         orderMeta.deliveryPointHash.toLowerCase() === nullHash.toLowerCase()
       
-      console.log("📊 Order Debug Info:", {
-        orderId,
-        type,
-        deliveryPointHash: orderMeta.deliveryPointHash,
-        nullHash,
-        isVirtualOrNoDelivery,
-        originalDeliveryStatus: Number(orderData.deliveryStatus),
-        orderState: Number(orderData.state),
-        digitalAssetCid
-      })
       
       // For virtual/no-delivery orders, auto-correct delivery status
       // If the order is Released (state 1) OR if it's funded (state 0), set status to Delivered (2)
@@ -287,21 +252,15 @@ export default function DeliveryPage() {
         const orderState = Number(orderData.state)
         // If Released or if still Created (old contract behavior)
         if ((orderState === 1 || orderState === 0) && correctedDeliveryStatus === 0) {
-          console.log("🔧 Auto-correcting delivery status for virtual/no-delivery order")
           correctedDeliveryStatus = 2 // Set to Delivered
         }
       }
       
-      console.log("✅ Final delivery status:", correctedDeliveryStatus)
-      console.log("🎨 Digital Asset CID:", digitalAssetCid)
-      console.log("🔍 Download button will show:", 
-        !isMerchant && type === "virtual" && digitalAssetCid && correctedDeliveryStatus === 2
-      )
 
       const orderDetails: OrderDetails = {
         orderId: orderId,
         tokenId: tokenId.toString(),
-        name: metadata.name || `Token #${tokenId}`,
+        name: metadata.name || `Token ${tokenId}`,
         description: metadata.description || "",
         image: imageUrl,
         imageIpfsHash: imageIpfsHash,
@@ -317,9 +276,6 @@ export default function DeliveryPage() {
         deliveryPointHash: orderMeta.deliveryPointHash,
       }
       
-      console.log("📦 [Delivery Page] Complete Order Details:", orderDetails)
-      console.log("👤 [Delivery Page] Is Merchant:", address?.toLowerCase() === orderDetails.merchantAddress?.toLowerCase())
-      console.log("👤 [Delivery Page] Is Buyer:", address?.toLowerCase() === orderDetails.buyerAddress?.toLowerCase())
 
       setOrder(orderDetails)
       setIsMerchant(address?.toLowerCase() === orderDetails.merchantAddress?.toLowerCase())
@@ -328,7 +284,6 @@ export default function DeliveryPage() {
       alert("Failed to load order details")
     } finally {
       setLoading(false)
-      console.log("✅ [Delivery Page] Loading complete")
     }
   }
 
@@ -364,7 +319,6 @@ export default function DeliveryPage() {
     setUpdating(true)
 
     try {
-      console.log("Updating delivery status to:", newStatus)
       
       const tx = await writeContract(config, {
         address: ESCROW_ADDRESS,
@@ -374,15 +328,14 @@ export default function DeliveryPage() {
         gas: 300000n,
       })
 
-      console.log("Transaction sent:", tx)
       await waitForTransactionReceipt(config, { hash: tx })
       
-      alert("✅ Status updated successfully!")
+      toast.success("Status updated successfully")
       await loadOrderDetails()
     } catch (error: any) {
       console.error("Failed to update status:", error)
       const errorMsg = error?.message || error?.shortMessage || "Unknown error"
-      alert(`❌ Failed to update status:\n${errorMsg}`)
+      toast.error(`Failed to update status: ${errorMsg}`)
     } finally {
       setUpdating(false)
     }
@@ -410,7 +363,6 @@ export default function DeliveryPage() {
     setUpdating(true)
 
     try {
-      console.log("Confirming delivery for order:", order.orderId)
       
       const tx = await writeContract(config, {
         address: ESCROW_ADDRESS,
@@ -420,15 +372,14 @@ export default function DeliveryPage() {
         gas: 500000n,
       })
 
-      console.log("Transaction sent:", tx)
       await waitForTransactionReceipt(config, { hash: tx })
       
-      alert("✅ Delivery confirmed successfully! Funds have been released to the merchant.")
+      toast.success("Delivery confirmed! Funds released to merchant")
       await loadOrderDetails()
     } catch (error: any) {
       console.error("Failed to confirm delivery:", error)
       const errorMsg = error?.message || error?.shortMessage || "Unknown error"
-      alert(`❌ Failed to confirm delivery:\n${errorMsg}`)
+      toast.error(`Failed to confirm delivery: ${errorMsg}`)
     } finally {
       setUpdating(false)
     }
@@ -452,11 +403,11 @@ export default function DeliveryPage() {
       })
 
       await waitForTransactionReceipt(config, { hash: tx })
-      alert("Order refunded successfully!")
+      toast.success("Order refunded successfully")
       await loadOrderDetails()
     } catch (error: any) {
       console.error("Failed to refund:", error)
-      alert(`Failed to refund: ${error?.message || "Unknown error"}`)
+      toast.error(`Refund failed: ${error?.message || "Unknown error"}`)
     } finally {
       setUpdating(false)
     }
@@ -488,12 +439,12 @@ export default function DeliveryPage() {
       })
 
       await waitForTransactionReceipt(config, { hash: tx })
-      alert("✅ Refund claimed successfully! Funds have been returned to your wallet.")
+      toast.success("Refund claimed! Funds returned to wallet")
       await loadOrderDetails()
     } catch (error: any) {
       console.error("Failed to claim refund:", error)
       const errorMsg = error?.message || error?.shortMessage || "Unknown error"
-      alert(`❌ Failed to claim refund:\n${errorMsg}`)
+      toast.error(`Failed to claim refund: ${errorMsg}`)
     } finally {
       setUpdating(false)
     }
@@ -502,19 +453,14 @@ export default function DeliveryPage() {
   const downloadDigitalAsset = async () => {
     if (!order?.digitalAssetCid || order.type !== "virtual") return
     
-    console.log("⬇️ [Delivery Page] Download initiated")
-    console.log("📦 [Delivery Page] Order:", order)
-    console.log("💾 [Delivery Page] Digital Asset CID:", order.digitalAssetCid)
     
     if (isMerchant) {
-      console.log("❌ [Delivery Page] Download blocked: User is merchant")
       alert("Only buyers can download the digital asset")
       return
     }
     
     // Check if delivery is completed
     if (order.deliveryStatus !== 2) {
-      console.log("❌ [Delivery Page] Download blocked: Delivery not completed (status:", order.deliveryStatus, ")")
       alert("Digital asset will be available after delivery is completed")
       return
     }
@@ -523,22 +469,17 @@ export default function DeliveryPage() {
 
     try {
       const ipfsUrl = `https://magenta-neat-tahr-183.mypinata.cloud/ipfs/${order.digitalAssetCid}`
-      console.log("📡 [Delivery Page] Fetching from IPFS:", ipfsUrl)
       
       // Fetch the file from IPFS
       const response = await fetch(ipfsUrl)
-      console.log("📡 [Delivery Page] IPFS response status:", response.status)
       
       if (!response.ok) throw new Error("Failed to fetch from IPFS")
       
       const blob = await response.blob()
-      console.log("📦 [Delivery Page] Blob size:", blob.size, "bytes")
       
       // Determine file extension from multiple sources
       const contentType = response.headers.get("content-type") || "application/octet-stream"
       const contentDisposition = response.headers.get("content-disposition")
-      console.log("📄 [Delivery Page] Content type:", contentType)
-      console.log("📄 [Delivery Page] Content disposition:", contentDisposition)
       
       let extension = ""
       
@@ -550,7 +491,6 @@ export default function DeliveryPage() {
           const extMatch = filename.match(/\.([^.]+)$/)
           if (extMatch) {
             extension = extMatch[1].toLowerCase()
-            console.log("📝 [Delivery Page] Extension from content-disposition:", extension)
           }
         }
       }
@@ -639,13 +579,11 @@ export default function DeliveryPage() {
           }
         }
         
-        console.log("📝 [Delivery Page] Extension from content-type:", extension)
       }
       
       // Final fallback
       if (!extension) {
         extension = "file"
-        console.log("⚠️ [Delivery Page] Using fallback extension:", extension)
       }
       
       // Create download link
@@ -654,7 +592,6 @@ export default function DeliveryPage() {
       a.href = url
       const fileName = `${order.name.replace(/[^a-z0-9]/gi, '_')}_${order.tokenId}.${extension}`
       a.download = fileName
-      console.log("💾 [Delivery Page] Download filename:", fileName)
       
       document.body.appendChild(a)
       a.click()
@@ -663,7 +600,6 @@ export default function DeliveryPage() {
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
       
-      console.log("✅ [Delivery Page] Digital asset downloaded successfully")
     } catch (error: any) {
       console.error("Failed to download:", error)
       alert(`❌ Failed to download digital asset:\n${error?.message || "Unknown error"}`)
@@ -749,7 +685,7 @@ export default function DeliveryPage() {
                 Order Details
               </span>
             </h1>
-            <p className="text-white/40 text-sm md:text-base mb-8">Order #{order.orderId}</p>
+            <p className="text-white/40 text-sm md:text-base mb-8">Order {order.orderId}</p>
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -997,7 +933,7 @@ export default function DeliveryPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
                     <span className="text-sm text-white/50">Order ID</span>
-                    <span className="text-sm font-mono text-white/80">#{order.orderId}</span>
+                    <span className="text-sm font-mono text-white/80">{order.orderId}</span>
                   </div>
 
                   <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">

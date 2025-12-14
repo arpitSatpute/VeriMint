@@ -10,7 +10,7 @@ import DefaultLayout from "@/layouts/default";
 import { useAccount } from "wagmi";
 import { useNavigate } from "react-router-dom";
 import LoadingOverlay from "@/components/LoadingOverlay";
-
+import toast from "react-hot-toast";
 
 type ElegantShapeProps = {
   className?: string;
@@ -177,7 +177,6 @@ export default function PhysicalProductMint() {
   })
 
   useEffect(() => {
-    console.log("Connected wallet address:", address);
   }, [address])
 
 
@@ -320,7 +319,6 @@ export default function PhysicalProductMint() {
       return alert('Metadata upload failed');
     }
 
-    console.log('Metadata CID:', meta.cid, 'URL:', meta.url)
 
     try {
       // Convert "physical" to bytes32 using keccak256
@@ -345,7 +343,7 @@ export default function PhysicalProductMint() {
       const receipt = await waitForTransactionReceipt(config, { hash: txHash });
       if (receipt.status === "success") {
         setIsLoading(false);
-        alert('Product minted successfully!');
+        toast.success('Physical product minted successfully');
         // Reset form
         setFormData({
           identityNumber: '',
@@ -364,12 +362,12 @@ export default function PhysicalProductMint() {
         setImagePreview(null);
       } else {
         setIsLoading(false);
-        alert('Transaction failed');
+        toast.error('Minting failed');
       }
     } catch (error) {
       console.error('Minting error:', error);
       setIsLoading(false);
-      alert('Failed to mint product. Please try again.');
+      toast.error('Minting failed. Please try again');
     }
     finally{
       navigate('/merchant');

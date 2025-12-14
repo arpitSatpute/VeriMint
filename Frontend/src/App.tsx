@@ -19,6 +19,7 @@ import DecryptPage from "./pages/delivery/DecryptPage";
 import InfoPage from "./pages/essentials/info";
 import ContactPage from "./pages/essentials/contact";
 import ScrollToTop from "./components/ScrollToTop";
+import { Toaster } from "react-hot-toast";
 
 
 const queryClient = new QueryClient();
@@ -30,6 +31,48 @@ function App() {
       <ThirdwebProvider>
         <QueryClientProvider client={queryClient} >
           <ScrollToTop />
+          <Toaster
+            position="bottom-right"
+            reverseOrder={false}
+            gutter={8}
+            toastOptions={{
+              // Define default options
+              className: '',
+              duration: 3000,
+              style: {
+                background: '#18181b',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.75rem',
+              },
+
+              // Default options for specific types
+              success: {
+                duration: 3000,
+                style: {
+                  background: '#18181b',
+                  color: '#fff',
+                  border: '1px solid rgba(74, 222, 128, 0.3)',
+                },
+                iconTheme: {
+                  primary: '#4ade80',
+                  secondary: '#18181b',
+                },
+              },
+              error: {
+                duration: 4000,
+                style: {
+                  background: '#18181b',
+                  color: '#fff',
+                  border: '1px solid rgba(248, 113, 113, 0.3)',
+                },
+                iconTheme: {
+                  primary: '#f87171',
+                  secondary: '#18181b',
+                },
+              },
+            }}
+          />
           <Routes>
             <Route element={<IndexPage />} path="/" />
             <Route element={<DocsPage />} path="/docs" />

@@ -10,6 +10,7 @@ import {
   verifyAddressCommitment,
 } from "@/lib/unifiedEncryption";
 import ESCROW_ABI from "@/abis/escrowMultiProduct.json";
+import toast from "react-hot-toast";
 
 interface MerchantAddressDecryptProps {
   orderId: string;
@@ -69,17 +70,14 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
   useEffect(() => {
     const preventCopy = (e: ClipboardEvent) => {
       e.preventDefault();
-      console.log('📋 Copy attempt blocked for privacy');
     };
 
     const preventCut = (e: ClipboardEvent) => {
       e.preventDefault();
-      console.log('✂️ Cut attempt blocked for privacy');
     };
 
     const preventDragStart = (e: DragEvent) => {
       e.preventDefault();
-      console.log('🚫 Drag attempt blocked for privacy');
     };
 
     window.addEventListener('copy', preventCopy);
@@ -107,7 +105,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       setLoading(true);
       setError(null);
 
-      console.log("🔍 Loading encrypted data for order:", orderId);
 
       // Try to get order details with multiple fallback patterns
       let buyerAddress: string | undefined;
@@ -123,34 +120,26 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
           args: [BigInt(orderId)],
         });
 
-        console.log("📋 getOrderDetails response:", orderDetailsRaw);
-        console.log("   Type:", typeof orderDetailsRaw);
-        console.log("   Is Array:", Array.isArray(orderDetailsRaw));
-        console.log("   Keys:", Object.keys(orderDetailsRaw || {}));
 
         // Try multiple access patterns
         // Pattern 1: Named fields
         if (orderDetailsRaw?.buyer && orderDetailsRaw?.merchant) {
           buyerAddress = orderDetailsRaw.buyer;
           merchantAddress = orderDetailsRaw.merchant;
-          console.log("   ✓ Using named fields (buyer, merchant)");
         }
         // Pattern 2: Array indices
         else if (orderDetailsRaw?.[0] && orderDetailsRaw?.[1]) {
           buyerAddress = orderDetailsRaw[0];
           merchantAddress = orderDetailsRaw[1];
-          console.log("   ✓ Using array indices [0], [1]");
         }
         // Pattern 3: Nested result
         else if (orderDetailsRaw?.result?.buyer && orderDetailsRaw?.result?.merchant) {
           buyerAddress = orderDetailsRaw.result.buyer;
           merchantAddress = orderDetailsRaw.result.merchant;
-          console.log("   ✓ Using nested result.buyer, result.merchant");
         }
         // Pattern 4: Array destructuring
         else if (Array.isArray(orderDetailsRaw) && orderDetailsRaw.length >= 2) {
           [buyerAddress, merchantAddress] = orderDetailsRaw;
-          console.log("   ✓ Using array destructuring");
         }
       } catch (getDetailsError: any) {
         console.warn("⚠️ getOrderDetails failed, trying direct mapping access:", getDetailsError.message);
@@ -158,7 +147,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
 
       // Method 2: Fallback to direct mapping access if above methods failed
       if (!buyerAddress || !merchantAddress) {
-        console.log("🔄 Trying direct mapping access: details[orderId]");
         try {
           const detailsRaw = await readContract(config, {
             address: ESCROW_ADDRESS,
@@ -167,12 +155,10 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
             args: [BigInt(orderId)],
           });
 
-          console.log("📋 details mapping response:", detailsRaw);
           
           if (detailsRaw) {
             buyerAddress = (detailsRaw as any).buyer || (detailsRaw as any)[0];
             merchantAddress = (detailsRaw as any).merchant || (detailsRaw as any)[1];
-            console.log("   ✓ Extracted from details mapping");
           }
         } catch (detailsError) {
           console.warn("⚠️ details mapping also failed:", detailsError);
@@ -180,12 +166,9 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       }
 
       // Final validation
-      console.log("🔍 Final extracted addresses:");
-      console.log("   Buyer:", buyerAddress);
-      console.log("   Merchant:", merchantAddress);
 
       if (!merchantAddress || !buyerAddress) {
-        console.error("❌ Could not extract addresses from any method");
+        console.error(" Could not extract addresses from any method");
         console.error("   Raw response was:", orderDetailsRaw);
         throw new Error(
           "Could not retrieve valid order details. Order may not exist or contract ABI may be incompatible."
@@ -210,13 +193,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       const isBuyer = normalizedCurrent === normalizedBuyer;
       const isAuthorized = isMerchant || isBuyer;
 
-      console.log("✓ Authorization check:");
-      console.log("   Your address:", normalizedCurrent);
-      console.log("   Merchant:", normalizedMerchant);
-      console.log("   Buyer:", normalizedBuyer);
-      console.log("   Is merchant:", isMerchant);
-      console.log("   Is buyer:", isBuyer);
-      console.log("   Is authorized:", isAuthorized);
 
       if (!isAuthorized) {
         throw new Error(
@@ -225,7 +201,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       }
 
       // Get encrypted delivery data
-      console.log("📦 Fetching encrypted delivery data...");
       const encryptedData = await readContract(config, {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
@@ -236,10 +211,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
 
       const [encryptedAddress, addressCommitment, dataToEncryptHash, decryptionDeadline, canDecryptNow] = encryptedData;
 
-      console.log("✓ Encrypted data retrieved:");
-      console.log("  Encrypted address hex length:", encryptedAddress.length);
-      console.log("  Has encrypted data:", encryptedAddress !== "0x");
-      console.log("  Can decrypt now:", canDecryptNow);
 
       if (encryptedAddress && encryptedAddress !== "0x") {
         setHasEncryptedData(true);
@@ -270,7 +241,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       }
 
     } catch (error: any) {
-      console.error("❌ Failed to load encrypted data:", error);
+      console.error(" Failed to load encrypted data:", error);
       console.error("   Full error details:", {
         message: error.message,
         cause: error.cause,
@@ -280,7 +251,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       let errorMessage = "Failed to load encrypted data";
       
       if (error.message?.includes("Could not retrieve valid order details")) {
-        errorMessage = `Order #${orderId} does not exist or has not been initialized. Please check the order ID.`;
+        errorMessage = `Order ${orderId} does not exist or has not been initialized. Please check the order ID.`;
       } else if (error.message?.includes("not been initialized")) {
         errorMessage = "Order exists but has not been funded yet. Please fund the escrow first.";
       } else if (error.message?.includes("Not authorized")) {
@@ -290,7 +261,7 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       } else if (error.message?.includes("ABI")) {
         errorMessage = "Contract ABI mismatch. Please ensure you're using the latest contract version.";
       } else if (error.message?.includes("execution reverted")) {
-        errorMessage = `Contract rejected the request. Order #${orderId} may not exist.`;
+        errorMessage = `Contract rejected the request. Order ${orderId} may not exist.`;
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -312,15 +283,13 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
     setError(null);
 
     try {
-      // ✅ DEVELOPMENT MODE: Check for mock decryption flag
+      // DEVELOPMENT MODE: Check for mock decryption flag
       const USE_MOCK_DECRYPTION = import.meta.env.VITE_USE_MOCK_DECRYPTION === 'true';
 
       if (USE_MOCK_DECRYPTION) {
-        console.log("🧪 Using MOCK decryption mode");
         
         // Step 1: Still log access on-chain for testing
         try {
-          console.log("📝 Logging access on-chain...");
           const requestTx = await writeContract(config, {
             address: ESCROW_ADDRESS,
             abi: ESCROW_ABI,
@@ -329,7 +298,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
             gas: 200000n,
           });
           await waitForTransactionReceipt(config, { hash: requestTx });
-          console.log("✅ Access logged on-chain");
         } catch (logError) {
           console.warn("⚠️ Could not log on-chain (skipping in mock mode):", logError);
         }
@@ -340,17 +308,14 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
         };
         const decrypted = await mockDecryptDeliveryAddress(orderId, address);
         
-        console.log("✅ Mock decryption complete");
         setDecryptedAddress(decrypted);
         await loadEncryptedData();
         return;
       }
 
-      // ✅ PRODUCTION MODE: Real Lit Protocol decryption
-      console.log("🔐 Using REAL Lit Protocol decryption");
+      // PRODUCTION MODE: Real Lit Protocol decryption
 
       // Step 1: Request decryption access on-chain (logs access)
-      console.log("📝 Requesting decryption access on-chain...");
       const requestTx = await writeContract(config, {
         address: ESCROW_ADDRESS,
         abi: ESCROW_ABI,
@@ -360,7 +325,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       });
 
       await waitForTransactionReceipt(config, { hash: requestTx });
-      console.log("✅ Access request logged on-chain");
 
       // Step 2: Get encrypted data from contract
       const encryptedData = await readContract(config, {
@@ -373,11 +337,6 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
 
       const [encryptedAddressHex, addressCommitment, dataToEncryptHash] = encryptedData;
 
-      console.log("📦 Encrypted data retrieved from contract:");
-      console.log("   Encrypted address (hex):", encryptedAddressHex.slice(0, 50) + "...");
-      console.log("   Hex length:", encryptedAddressHex.length);
-      console.log("   DataToEncryptHash:", dataToEncryptHash);
-      console.log("   Address commitment:", addressCommitment);
 
       // Validate we have data
       if (!encryptedAddressHex || encryptedAddressHex === "0x" || encryptedAddressHex.length < 10) {
@@ -385,16 +344,9 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
       }
 
       // Step 3: Get authentication signature from wallet
-      console.log("🔑 Getting authentication signature from wallet...");
       const authSig = await getAuthSignature();
-      console.log("✅ Authentication signature obtained");
 
       // Step 4: Decrypt using Lit Protocol
-      console.log("🔓 Decrypting address with Lit Protocol...");
-      console.log("   Passing to decrypt:");
-      console.log("   - encryptedHex:", encryptedAddressHex.slice(0, 50) + "...");
-      console.log("   - dataToEncryptHash:", dataToEncryptHash);
-      console.log("   - merchantAddress:", address);
       
       const decrypted = await decryptDeliveryAddress(
         encryptedAddressHex,     // Pass the hex string directly from contract
@@ -403,25 +355,21 @@ export default function MerchantAddressDecrypt({ orderId }: MerchantAddressDecry
         authSig                   // Wallet signature
       );
 
-      console.log("✅ Decryption completed");
-      console.log("   Decrypted length:", decrypted.length);
 
       // Step 5: Verify commitment
-      console.log("✓ Verifying address commitment...");
       const isValid = verifyAddressCommitment(decrypted, addressCommitment);
 
       if (!isValid) {
         throw new Error("Address verification failed! Decrypted data does not match commitment. Data may be corrupted.");
       }
 
-      console.log("✅ Address decrypted and verified successfully");
       setDecryptedAddress(decrypted);
       
       // Reload to show access log
       await loadEncryptedData();
 
     } catch (error: any) {
-      console.error("❌ Decryption failed:", error);
+      console.error(" Decryption failed:", error);
       console.error("   Full error object:", {
         message: error?.message,
         name: error?.name,

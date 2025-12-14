@@ -10,7 +10,7 @@ import { parseEther, keccak256, toBytes } from "viem";
 import { useAccount } from "wagmi"; // ✅ Add this import
 import { Navigate, useNavigate } from "react-router-dom";
 import LoadingOverlay from "@/components/LoadingOverlay";
-
+import toast from "react-hot-toast";
 
 type ElegantShapeProps = {
   className?: string;
@@ -227,7 +227,6 @@ export default function VirtualProductMint() {
     if (!digitalAssetFile) return null;
 
     try {
-      console.log("📦 Uploading digital asset to IPFS...");
       
       const form = new FormData();
       form.append("file", digitalAssetFile);
@@ -250,7 +249,6 @@ export default function VirtualProductMint() {
 
       const cid: string = response.data?.IpfsHash;
       if (!cid) throw new Error("No IpfsHash returned from Pinata");
-      console.log("✅ Digital asset uploaded to IPFS:", cid);
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` };
     } catch (err: any) {
       console.error("Digital asset upload failed:", err?.response?.data ?? err);
@@ -261,8 +259,6 @@ export default function VirtualProductMint() {
     // Upload NFT metadata JSON to IPFS via Pinata
     const uploadJsonToIPFS = async (imageCid: string, digitalAssetCid?: string): Promise<{ cid: string; url: string } | null> => {
       try {
-        console.log("📦 Creating metadata JSON");
-        console.log("Connected Address:", address);
         
         const metadata: any = {
           name: formData.name || 'Product',
@@ -287,7 +283,6 @@ export default function VirtualProductMint() {
           metadata.digital_asset = `ipfs://${digitalAssetCid}`;
         }
 
-      console.log("📝 Metadata to upload:", JSON.stringify(metadata, null, 2));
 
       const body = {
         pinataOptions: { cidVersion: 1 },
@@ -307,7 +302,6 @@ export default function VirtualProductMint() {
       )
 
       const cid: string = res.data.IpfsHash
-      console.log("✅ Metadata uploaded to IPFS:", cid);
       return { cid, url: `https://gateway.pinata.cloud/ipfs/${cid}` }
     } catch (e) {
       console.error('❌ JSON upload failed:', e)
@@ -349,8 +343,6 @@ export default function VirtualProductMint() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
-    console.log("🚀 Starting mint process");
-    console.log("Connected Address:", address);
     
     if (!address) {
       alert('Please connect your wallet first');
@@ -360,52 +352,37 @@ export default function VirtualProductMint() {
     setIsLoading(true);
     setLoadingMessage("Uploading image to IPFS...");
     
-    console.log("1️⃣ Uploading image to IPFS...");
     const img = await uploadImageToIPFS()
     if (!img) {
       setIsLoading(false);
       alert('Image upload failed')
       return;
     }
-    console.log("✅ Image uploaded:", img.cid);
 
     // Upload digital asset if provided
     let digitalAsset = null;
     if (digitalAssetFile) {
       setLoadingMessage("Uploading digital asset to IPFS...");
-      console.log("2️⃣ Uploading digital asset to IPFS...");
       digitalAsset = await uploadDigitalAssetToIPFS();
       if (!digitalAsset) {
         console.warn('⚠️ Digital asset upload failed, continuing without it');
       } else {
-        console.log("✅ Digital asset uploaded:", digitalAsset.cid);
       }
     }
 
     setLoadingMessage("Uploading metadata to IPFS...");
-    console.log("3️⃣ Uploading metadata to IPFS...");
     const meta = await uploadJsonToIPFS(img.cid, digitalAsset?.cid)
     if (!meta) {
       setIsLoading(false);
       alert('Metadata upload failed')
       return;
     }
-    console.log("✅ Metadata uploaded:", meta.cid);
 
     setLoadingMessage("Minting NFT on blockchain...");
-    console.log("4️⃣ Minting NFT on blockchain...");
     
     // Convert "virtual" to bytes32 using keccak256
     const productTypeBytes32 = keccak256(toBytes("virtual"));
     
-    console.log("Args:", {
-      supply: formData.supply,
-      price: parseEther(formData.price),
-      name: formData.name,
-      description: formData.description,
-      type: "virtual",
-      uri: meta.cid
-    });
 
     const txHash = await writeContract(config, {
       address: MULTI_PRODUCT_ADDRESS,
@@ -422,18 +399,14 @@ export default function VirtualProductMint() {
     });
 
     setLoadingMessage("Waiting for transaction confirmation...");
-    console.log("⏳ Waiting for transaction confirmation...", txHash);
     const receipt = await waitForTransactionReceipt(config, { hash: txHash });
     
     if (receipt.status === "success") {
       setIsLoading(false);
-      console.log("✅ NFT minted successfully!");
-      console.log('Virtual Product NFT minted successfully!');
       navigate('/merchant');
     } else {
       setIsLoading(false);
-      console.log("❌ Transaction failed");
-      alert('Transaction failed');
+      toast.error('Minting failed');
     }
 
     

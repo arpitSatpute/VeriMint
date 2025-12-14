@@ -9,6 +9,7 @@ import { config } from "@/config/config";
 import PRODUCT_NFT_ABI from "@/abis/productNft.json";
 import ElegantShapes from "@/components/ElegantShapes";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import toast from "react-hot-toast";
 
 interface NFTMetadata {
   name: string;
@@ -114,7 +115,6 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist, onViewDetails }
               {truncateText(nft.name, 20)}
             </h3>
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.08] shrink-0">
-              <span className="text-xs text-white/40">#</span>
               <span className="text-xs text-white/60 font-mono">{nft.tokenId}</span>
             </div>
           </div>
@@ -467,7 +467,7 @@ function Merchant() {
             return {
               id: idx + 1,
               tokenId: tid.toString(),
-              name: metadata.name || `Token #${tid}`,
+              name: metadata.name || `Token ${tid}`,
               description: metadata.description || "No description available",
               image: imageUrl,
               price: (Number(product.price) / 1e18).toFixed(4),
@@ -493,7 +493,7 @@ function Merchant() {
   };
 
   const handleBurn = (id: number) => {
-    alert(`Burn confirmation for NFT #${id}`)
+    alert(`Burn confirmation for NFT ${id}`)
   }
 
   const handleList = async (id: number) => {
@@ -521,7 +521,7 @@ function Merchant() {
       // 3. Check transaction status
       if (receipt.status === 'success') {
         setIsLoading(false);
-        alert(`NFT #${id} listed successfully!`);
+        toast.success(`Product ${id} listed successfully`);
         // Refresh the NFT list to update isListed status
         await loadMerchantNFTs();
       } else {
@@ -531,7 +531,7 @@ function Merchant() {
     } catch (error) {
       setIsLoading(false);
       console.error('Failed to list NFT:', error);
-      alert('Failed to list NFT. Check console for details.');
+      toast.error('Failed to list product');
     }
   }
 
@@ -557,7 +557,7 @@ function Merchant() {
       
       if (receipt.status === 'success') {
         setIsLoading(false);
-        alert(`NFT #${id} removed from listing!`);
+        toast.success(`Product ${id} unlisted successfully`);
         await loadMerchantNFTs();
       } else {
         setIsLoading(false);
@@ -566,7 +566,7 @@ function Merchant() {
     } catch (error) {
       setIsLoading(false);
       console.error('Failed to unlist NFT:', error);
-      alert('Failed to unlist NFT. Check console for details.');
+      toast.error('Failed to unlist product');
     }
   }
 

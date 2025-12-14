@@ -187,7 +187,7 @@ export default function ProductDetails() {
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 text-center">
                   <Hash className="w-5 h-5 text-indigo-400 mx-auto mb-2" />
-                  <div className="text-lg font-bold text-white/90 font-mono">#{nft.tokenId}</div>
+                  <div className="text-lg font-bold text-white/90 font-mono">{nft.tokenId}</div>
                   <div className="text-xs text-white/40">Token ID</div>
                 </div>
                 <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.08] rounded-xl p-4 text-center">

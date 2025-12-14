@@ -17,6 +17,7 @@ import {
   verifyAddressCommitment,
   generateDeliveryHash,
 } from "@/lib/unifiedEncryption";
+import toast from "react-hot-toast";
 
 interface FormDataType {
   tokenId: string
@@ -110,7 +111,6 @@ export default function CreateOrder() {
       }) as bigint;
 
       setMaxSupply(Number(available));
-      console.log("✅ Available supply:", Number(available));
     } catch (error) {
       console.error("Failed to fetch available supply:", error);
       setMaxSupply(0);
@@ -181,12 +181,10 @@ export default function CreateOrder() {
       setSubmitting(true);
       setIsLoading(true);
       setLoadingMessage("Validating product listing...");
-      console.log("🚀 Starting order creation...");
       
       const quantity = BigInt(formData.quantity);
       
       const tokenIdBig = BigInt(nftData?.tokenId || '0');
-      console.log("🔍 Pre-flight checks - TokenID:", tokenIdBig.toString());
       
       // Verify product is still listed
       const isListed = await readContract(config, {
@@ -196,7 +194,6 @@ export default function CreateOrder() {
         args: [tokenIdBig],
       }) as boolean;
 
-      console.log("✓ Product listed:", isListed);
       if (!isListed) {
         setIsLoading(false);
         throw new Error("Product is no longer listed");
@@ -211,7 +208,6 @@ export default function CreateOrder() {
         args: [tokenIdBig],
       }) as bigint;
 
-      console.log("✓ Available supply:", currentAvailable.toString());
       if (currentAvailable < quantity) {
         setIsLoading(false);
         throw new Error(`Insufficient supply. Only ${currentAvailable} units available`);
@@ -228,16 +224,7 @@ export default function CreateOrder() {
       const pricePerUnit = listedProduct[1];
       const totalWei = pricePerUnit * quantity;
       
-      console.log("✓ Merchant:", listedProduct[0]);
-      console.log("✓ Price per unit:", pricePerUnit.toString());
-      console.log("✓ Total WEI:", totalWei.toString());
       
-      console.log("💰 Order details:", {
-        pricePerUnit: pricePerUnit.toString(),
-        quantity: quantity.toString(),
-        totalWei: totalWei.toString(),
-        totalEth: (Number(totalWei) / 1e18).toFixed(18)
-      });
       
       // Build delivery data
       let deliveryAddress = "";
@@ -256,12 +243,10 @@ export default function CreateOrder() {
         
         // Generate hash for backward compatibility
         deliveryPointHash = generateDeliveryHash(deliveryAddress);
-        console.log("📦 Shipping Address Hash:", deliveryPointHash);
 
         // ✅ NEW: Encrypt address if supported and enabled
         if (useEncryption && encryptionSupported && deliveryAddress) {
           try {
-            console.log("🔐 Encrypting delivery address...");
 
             const encryptedData = await encryptDeliveryAddress(
               deliveryAddress,
@@ -273,9 +258,6 @@ export default function CreateOrder() {
             addressCommitment = formatted.addressCommitment;
             dataToEncryptHash = formatted.dataToEncryptHash;
 
-            console.log("✅ Address encrypted successfully");
-            console.log("🔑 Encrypted Address Length:", encryptedAddress.length);
-            console.log("🔑 Commitment:", addressCommitment);
           } catch (encryptError: any) {
             console.error("⚠️ Encryption failed, falling back to hash only:", encryptError);
             alert(`⚠️ Encryption failed: ${encryptError?.message || "Unknown error"}\n\nContinuing with unencrypted order...`);
@@ -285,7 +267,6 @@ export default function CreateOrder() {
       } else {
         // Use null hash for virtual products or if no shipping needed
         deliveryPointHash = generateDeliveryHash("null");
-        console.log("📦 Null Hash (No Shipping):", deliveryPointHash);
       }
 
       // Check if contract supports encryption (has 6 parameters)
@@ -314,7 +295,6 @@ export default function CreateOrder() {
         gas: supportsEncryption ? 2000000n : 1500000n, // Increased gas for encryption storage
       });
       
-      console.log("⏳ Transaction sent:", tx);
       
       setLoadingMessage("Waiting for transaction confirmation...");
       const receipt = await waitForTransactionReceipt(config, { 
@@ -324,7 +304,6 @@ export default function CreateOrder() {
       });
       
       if (receipt.status === "success") {
-        console.log("✅ Order created! Gas used:", receipt.gasUsed.toString());
         
         if (!nftData) {
           throw new Error("NFT data is missing");
@@ -384,7 +363,7 @@ export default function CreateOrder() {
         }
       }
       
-      alert(`❌ Failed to create order:\n${errorMessage}`);
+      toast.error(`Failed to create order: ${errorMessage}`);
     } finally {
       setSubmitting(false);
     }

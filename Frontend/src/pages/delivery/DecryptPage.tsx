@@ -70,7 +70,7 @@ export default function DecryptPage() {
                   </span>
                 </h1>
                 <p className="text-white/50 text-sm md:text-base">
-                  Securely decrypt and view the encrypted delivery address for order #{orderId}
+                  Securely decrypt and view the encrypted delivery address for order {orderId}
                 </p>
               </div>
 
@@ -102,7 +102,7 @@ export default function DecryptPage() {
                   </div>
                   <div>
                     <div className="text-xs text-white/40 mb-1">Order ID</div>
-                    <div className="font-mono text-sm text-white/90">#{orderId}</div>
+                    <div className="font-mono text-sm text-white/90">{orderId}</div>
                   </div>
                 </div>
               </motion.div>

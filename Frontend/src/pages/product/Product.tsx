@@ -115,7 +115,7 @@ function NFTCard({ nft, index }: NFTCardProps) {
               {nft.name}
             </h3>
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.08] shrink-0">
-              <span className="text-xs text-white/40">#</span>
+              <span className="text-xs text-white/40"></span>
               <span className="text-xs text-white/60 font-mono">{nft.tokenId}</span>
             </div>
           </div>
@@ -213,7 +213,7 @@ export default function Product() {
 
             // Fetch JSON metadata with gateway fallback
             let metadata: NFTMetadata = {
-              name: product.name || `Token #${tid}`,
+              name: product.name || `Token ${tid}`,
               description: product.description || "No description available",
               image: "/placeholder.png",
               attributes: []
@@ -240,7 +240,7 @@ export default function Product() {
                 if (response.ok) {
                   const fetchedData = await response.json();
                   metadata = {
-                    name: fetchedData.name || product.name || `Token #${tid}`,
+                    name: fetchedData.name || product.name || `Token ${tid}`,
                     description: fetchedData.description || product.description || "No description available",
                     image: fetchedData.image || "/placeholder.png",
                     attributes: fetchedData.attributes || []
@@ -336,7 +336,7 @@ export default function Product() {
             return {
               id: idx + 1,
               tokenId: tid.toString(),
-              name: product.name || metadata.name || `Token #${tid}`,
+              name: product.name || metadata.name || `Token ${tid}`,
               description: product.description || metadata.description || "No description available",
               image: imageUrl,
               price: (Number(product.price) / 1e18).toFixed(4),

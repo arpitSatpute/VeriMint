@@ -117,9 +117,9 @@ function OrderCard({ order, index, isMerchant }: OrderCardProps) {
               </span>
             </div>
             <div className="flex items-center gap-3 text-sm text-white/50">
-              <span className="font-mono">#{order.tokenId}</span>
+              <span className="font-mono">{order.tokenId}</span>
               <span>•</span>
-              <span>Order #{order.orderId}</span>
+              <span>Order {order.orderId}</span>
               <span>•</span>
               <span>Qty: {order.supply}</span>
             </div>
@@ -251,7 +251,7 @@ export default function Order() {
 
           // Step 4: Extract CID and fetch metadata from IPFS
           let metadata: any = {
-            name: `Token #${tokenId}`,
+            name: `Token ${tokenId}`,
             description: "",
             image: "/placeholder.png",
             attributes: []
@@ -342,7 +342,6 @@ export default function Order() {
             digitalAssetCid = metadata.digital_asset.startsWith("ipfs://") 
               ? metadata.digital_asset.replace("ipfs://", "") 
               : metadata.digital_asset
-            console.log("💾 [Order Page] Digital asset CID found for order", orderId.toString(), ":", digitalAssetCid)
           }
 
           // Step 7: Format date
@@ -365,7 +364,6 @@ export default function Order() {
             orderMetaData.deliveryPointHash.toLowerCase().includes('null')
           
           if (isVirtualOrNoDelivery && (orderStateNum === 1 || orderStateNum === 0) && correctedDeliveryStatusNum === 0) {
-            console.log(`🔧 Auto-correcting delivery status for order ${orderId}`)
             correctedDeliveryStatusNum = 2 // Set to Delivered
           }
           
@@ -375,7 +373,7 @@ export default function Order() {
             id: Number(orderId),
             orderId: orderId.toString(),
             tokenId: tokenId.toString(),
-            name: metadata.name || `Token #${tokenId}`,
+            name: metadata.name || `Token ${tokenId}`,
             description: metadata.description || "",
             price: (Number(orderMetaData.totalPrice) / 1e18).toFixed(4),
             type,
