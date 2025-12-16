@@ -156,18 +156,7 @@ function MerchantNFTCard({ nft, index, onBurn, onList, onUnlist, onViewDetails }
                   className="absolute bottom-full left-0 right-0 mb-2 bg-[#0a0a0a] border border-white/[0.15] rounded-xl p-2 shadow-2xl z-10"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <motion.button
-                    whileHover={{ scale: 1.02, x: 4 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onBurn(nft.id);
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-rose-300 hover:bg-rose-500/10 transition-all text-sm"
-                  >
-                    <Flame className="w-4 h-4" />
-                    Burn NFT
-                  </motion.button>
-
+                  
                   {nft.isListed ? (
                     <motion.button
                       whileHover={{ scale: 1.02, x: 4 }}
@@ -479,8 +468,37 @@ function Merchant() {
     }
   };
 
-  const handleBurn = (id: number) => {
-    toast.error(`Burn confirmation for NFT ${id}`)
+  const handleBurn = async (id: number) => {
+    const nft = nfts.find(n => n.id === id);
+    if (!nft) return;
+
+    try {
+      setIsLoading(true);
+      setLoadingMessage("Burning NFT...");
+
+      const amount = BigInt(nft.supply);
+      const txHash = await writeContract(config, {
+        address: PRODUCT_NFT_ADDRESS,
+        abi: PRODUCT_NFT_ABI,
+        functionName: "burnProduct",
+        args: [BigInt(nft.tokenId), amount],
+      });
+
+      setLoadingMessage("Waiting for transaction confirmation...");
+      const receipt = await waitForTransactionReceipt(config, { hash: txHash });
+
+      if (receipt.status === 'success') {
+        setIsLoading(false);
+        toast.success(`NFT ${nft.tokenId} burned successfully`);
+        await loadMerchantNFTs();
+      } else {
+        setIsLoading(false);
+        alert('Transaction failed');
+      }
+    } catch (error: any) {
+      setIsLoading(false);
+      toast.error(error?.shortMessage || 'Failed to burn NFT');
+    }
   }
 
   const handleList = async (id: number) => {
